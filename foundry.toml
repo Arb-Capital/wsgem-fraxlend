@@ -1,6 +1,22 @@
 [profile.default]
-src = "src"
-out = "out"
-libs = ["lib"]
+src               = "src"
+out               = "out"
+libs              = ["lib"]
+build_info        = true
+sizes             = true
+optimizer         = true
+optimizer_runs    = 21_000
+solc_version      = "0.8.34"
+# The fork suite calls into live contracts compiled for a post-Paris target. evm_version is global
+# to the EVM, so under `paris` every one of those calls fails with NotActivated.
+evm_version       = "cancun"
+gas_limit         = "18446744073709551615" # u64::MAX
+
+[profile.default.fuzz]
+runs              = 256
+max_test_rejects  = 65536
+
+[rpc_endpoints]
+mainnet           = "${ETH_RPC_URL}"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
