@@ -4,16 +4,12 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {WsgemFraxlendDualOracle} from "../../src/WsgemFraxlendDualOracle.sol";
-import {IWsgem}                  from "../../src/interfaces/IWsgem.sol";
-import {IChainlinkAggregator}    from "../../src/interfaces/IChainlinkAggregator.sol";
-import {
-    IFraxlendPair,
-    IFraxlendPairDeployer,
-    IERC20Minimal
-} from "../../src/interfaces/IFraxlend.sol";
+import {IWsgem} from "../../src/interfaces/IWsgem.sol";
+import {IChainlinkAggregator} from "../../src/interfaces/IChainlinkAggregator.sol";
+import {IFraxlendPair, IFraxlendPairDeployer, IERC20Minimal} from "../../src/interfaces/IFraxlend.sol";
 import {WstGBPFrxUSDMarketScript} from "../../script/WstGBPFrxUSD.s.sol";
-import {WstGBPFrxUSDConstants}    from "../../script/WstGBPFrxUSD.s.sol";
-import {WsgemFraxlendConfig}      from "../../script/WsgemFraxlendDeploy.s.sol";
+import {WstGBPFrxUSDConstants} from "../../script/WstGBPFrxUSD.s.sol";
+import {WsgemFraxlendConfig} from "../../script/WsgemFraxlendDeploy.s.sol";
 
 /// @dev The wsgem's compliance layer, declared here because only this rehearsal touches it: the
 ///      token consults `Cop(cop).pass(usr)` on every transfer party.
@@ -67,23 +63,23 @@ contract MarketScriptHarness is WstGBPFrxUSDMarketScript {
 contract WstGBPFrxUSDPairForkTest is Test {
     address internal constant FRAX_DEPLOYER_EOA = 0xa4EC124e09D6D1A092c6BD16aFac9CD83f73E3c3;
 
-    MarketScriptHarness     internal harness;
+    MarketScriptHarness internal harness;
     WsgemFraxlendDualOracle internal oracle;
-    IFraxlendPair           internal pair;
+    IFraxlendPair internal pair;
 
     address internal wstgbp;
     address internal frxusd;
 
-    address internal lender     = makeAddr("lender");
-    address internal borrower   = makeAddr("borrower");
+    address internal lender = makeAddr("lender");
+    address internal borrower = makeAddr("borrower");
     address internal liquidator = makeAddr("liquidator");
 
     function setUp() public {
         vm.createSelectFork(vm.envString("ETH_RPC_URL"), vm.envUint("ETH_FORK_BLOCK"));
 
         harness = new MarketScriptHarness();
-        wstgbp  = harness.WSGEM();
-        frxusd  = harness.ASSET();
+        wstgbp = harness.WSGEM();
+        frxusd = harness.ASSET();
 
         // Step 1, as the oracle script would build it.
         oracle = new WsgemFraxlendDualOracle(
@@ -106,8 +102,8 @@ contract WstGBPFrxUSDPairForkTest is Test {
         // that must already hold the seed liquidity in the asset token.
         // Every harness read is materialised BEFORE the prank: a nested call, even a view one,
         // would consume it and the deploy would run unpranked into the whitelist gate.
-        address deployer_     = harness.PAIR_DEPLOYER();
-        bytes memory config_  = harness.configDataX();
+        address deployer_ = harness.PAIR_DEPLOYER();
+        bytes memory config_ = harness.configDataX();
         deal(frxusd, deployer_, 1_000_000e18);
 
         vm.prank(FRAX_DEPLOYER_EOA);
@@ -117,11 +113,7 @@ contract WstGBPFrxUSDPairForkTest is Test {
         // Open the wsgem's compliance gate for every party in this rehearsal. The selector-only
         // mock answers `pass(anyone) == true`, which is the production prerequisite the Frax team
         // must arrange for the pair address anyway.
-        vm.mockCall(
-            IGatedToken(wstgbp).cop(),
-            abi.encodeWithSelector(ICop.pass.selector),
-            abi.encode(true)
-        );
+        vm.mockCall(IGatedToken(wstgbp).cop(), abi.encodeWithSelector(ICop.pass.selector), abi.encode(true));
 
         // Fund the actors and stock the lending side.
         deal(frxusd, lender, 1_000_000e18);
@@ -158,7 +150,7 @@ contract WstGBPFrxUSDPairForkTest is Test {
 
         (,,, uint256 low_, uint256 high_) = pair.exchangeRateInfo();
         (, uint256 oLow_, uint256 oHigh_) = oracle.getPrices();
-        assertEq(low_,  oLow_);
+        assertEq(low_, oLow_);
         assertEq(high_, oHigh_);
     }
 
@@ -186,11 +178,7 @@ contract WstGBPFrxUSDPairForkTest is Test {
         // Administratively widen the wrapper's spread: mintcost 10% over burncost puts the
         // low/high deviation at ~9%, past the pair's 5% gate.
         uint256 burn_ = IWsgem(wstgbp).burncost();
-        vm.mockCall(
-            wstgbp,
-            abi.encodeWithSelector(IWsgem.mintcost.selector),
-            abi.encode(burn_ * 110 / 100)
-        );
+        vm.mockCall(wstgbp, abi.encodeWithSelector(IWsgem.mintcost.selector), abi.encode(burn_ * 110 / 100));
 
         // The pair reuses stored rates within one timestamp; a second in, it must consult the
         // oracle again and see the widened spread.
@@ -249,7 +237,7 @@ contract WstGBPFrxUSDPairForkTest is Test {
         vm.warp(block.timestamp + 1); // step past the pair's same-timestamp rate reuse
         pair.updateExchangeRate();
 
-        uint256 sharesBefore_     = pair.userBorrowShares(borrower);
+        uint256 sharesBefore_ = pair.userBorrowShares(borrower);
         uint256 collateralBefore_ = pair.userCollateralBalance(borrower);
 
         vm.startPrank(liquidator);

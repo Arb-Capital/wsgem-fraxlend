@@ -4,7 +4,9 @@
 # helper and any other non-forge child would see none of it and silently fall back to defaults.
 export
 
-all         :; make deps && make build && make test
+REQUIRED_FORGE_VERSION := 1.7.1
+
+all         :; $(MAKE) deps && $(MAKE) build && $(MAKE) test
 
 deps        :; forge install
 
@@ -12,6 +14,48 @@ build       :; forge build
 clean       :; forge clean && rm -rf -- ./cache
 sizes       :; forge build --sizes
 fmt         :; forge fmt
+fmt-check   :; forge fmt --check
+lint        :; forge lint
+
+# The release toolchain is pinned because compiler metadata and deploy artifacts are part of what
+# gets reviewed. solc itself is pinned in foundry.toml; this guard pins the forge version that
+# resolves it, formats the sources and produces the broadcast bundle.
+check-toolchain :
+	@actual="$$(forge --version | sed -n 's/^forge Version: //p')"; \
+	test "$${actual}" = "$(REQUIRED_FORGE_VERSION)" || { \
+		echo "forge $(REQUIRED_FORGE_VERSION) is required (got: $${actual:-unavailable})"; \
+		exit 1; \
+	}
+
+# A broadcast must come from a committed tree: source verification and the independent review are
+# tied to that exact commit, not to an unrecorded local diff.
+clean-tree :
+	@state="$$(git status --porcelain --untracked-files=all)"; \
+	test -z "$${state}" || { \
+		echo "the release tree is not clean:"; \
+		git status --short; \
+		exit 1; \
+	}
+
+# Deterministic, no-RPC checks. Keep these sequential: Foundry's build, coverage and size commands
+# share out/ and cache/.
+check :
+	@$(MAKE) check-toolchain
+	@$(MAKE) fmt-check
+	@$(MAKE) build
+	@$(MAKE) lint
+	@$(MAKE) test
+	@$(MAKE) coverage
+	@$(MAKE) sizes
+
+# Prints the immutable release identifiers that are copied into the deployment record. The
+# creation-bytecode hash is pre-constructor; the deployed runtime hash is recorded from chain.
+release-info : build
+	@echo "commit: $$(git rev-parse HEAD)"
+	@forge --version | sed -n '1p'
+	@echo "solc: 0.8.34; evm: cancun; optimizer runs: 21000"
+	@echo -n "oracle creation bytecode keccak: "
+	@forge inspect WsgemFraxlendDualOracle bytecode | cast keccak
 
 # Unit tests. No RPC, no network, no node. Fork tests are excluded on purpose. The redaction
 # filter's own suite rides along: a silent regression there leaks provider keys into CI logs.
@@ -175,5 +219,29 @@ market-resume :
 		--rpc-url $${ETH_RPC_URL} --sender $(ETH_FROM) --keystore $(ETH_KEYSTORE) \
 		$(GAS_FLAGS) --slow --broadcast --resume -vvvv 2> >($(REDACT) >&2)
 
-.PHONY: all deps build clean sizes fmt test test-fork coverage gen-report serve-report \
-	oracle-dry oracle-deploy configdata market-dry market-deploy market-resume
+# Necessary-but-not-sufficient release gates. An independent review of the exact clean commit is
+# still mandatory; see docs/deployment-runbook.md. The oracle and market stages are separate
+# because ORACLE() must be zero for the first and populated for the second.
+predeploy-oracle :
+	@$(call require_rpc)
+	@$(call require_instance)
+	@$(MAKE) clean-tree
+	@$(MAKE) check
+	@$(MAKE) test-fork
+	@$(MAKE) oracle-dry INSTANCE=$(INSTANCE)
+	@$(MAKE) clean-tree
+	@$(MAKE) release-info
+
+predeploy-market :
+	@$(call require_rpc)
+	@$(call require_instance)
+	@$(MAKE) clean-tree
+	@$(MAKE) check
+	@$(MAKE) test-fork
+	@$(MAKE) configdata INSTANCE=$(INSTANCE)
+	@$(MAKE) clean-tree
+	@$(MAKE) release-info
+
+.PHONY: all deps build clean sizes fmt fmt-check lint check-toolchain clean-tree check \
+	release-info test test-fork coverage gen-report serve-report oracle-dry oracle-deploy \
+	configdata market-dry market-deploy market-resume predeploy-oracle predeploy-market

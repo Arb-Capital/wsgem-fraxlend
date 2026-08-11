@@ -62,19 +62,27 @@ docs/                             design argument, instance sheets, address refe
 ## Deploying a market
 
 FraxLend pair deployment is **whitelist-gated**: `FraxlendPairDeployer.deploy()` only accepts
-whitelisted senders, and in practice the Frax team runs it. The order is:
+whitelisted senders, and in practice the Frax team runs it. An independent review of the exact
+release commit and bytecode is a hard gate. The operational checklist and release-record template
+are in [docs/deployment-runbook.md](docs/deployment-runbook.md). The order is:
 
-1. `make oracle-dry INSTANCE=WstGBPFrxUSD` — keyless simulation of the oracle deploy.
+1. `make predeploy-oracle INSTANCE=WstGBPFrxUSD` — clean-tree, toolchain, local, fork and keyless
+   live-deployment checks. The release toolchain is Forge 1.7.1 and Solc 0.8.34.
 2. `make oracle-deploy INSTANCE=WstGBPFrxUSD` — broadcast + Etherscan verify (keystore signing;
    see `.env.example`).
-3. Write the deployed address into `ORACLE()` in `script/WstGBPFrxUSD.s.sol` (the market target
-   refuses to run until this is done; the oracle target refuses to run again after it is).
-4. `make configdata INSTANCE=WstGBPFrxUSD` — validates the recorded oracle against live state and
-   prints the 288-byte `configData` plus a decode table. **This is the hand-off artifact**: send
-   it with the whitelisting request in
+3. Write the deployed address into `ORACLE()` in `script/WstGBPFrxUSD.s.sol`, change its pin test
+   from zero to that exact address, and update the instance sheet. The market target refuses to
+   run until this is done; the oracle target refuses to run again after it is.
+4. `make predeploy-market INSTANCE=WstGBPFrxUSD` — reruns every check, validates the recorded
+   oracle against live state, and prints the 288-byte `configData` plus a decode table. **This is
+   the hand-off artifact**: send it with the whitelisting request in
    [docs/instances/wstgbp-frxusd.md](docs/instances/wstgbp-frxusd.md) to the Frax team.
 5. If (and only if) the sender is whitelisted: `make market-deploy INSTANCE=WstGBPFrxUSD` runs
    `deploy()` directly and asserts the resulting pair field by field.
+
+If the oracle transaction lands but automatic source verification fails, do not rerun the deploy.
+Recover and verify the existing address using the runbook; a retry would create a second immutable
+oracle while `ORACLE()` is still unset.
 
 A future wsgem market is a new sibling of `script/WstGBPFrxUSD.s.sol` plus its pin test and
 instance sheet — never an edit to `src/` or the generic scripts.
@@ -82,8 +90,10 @@ instance sheet — never an edit to `src/` or the generic scripts.
 ## Tests
 
 ```
-make test        # unit + pin suites; no RPC
-make test-fork   # mainnet fork at a pinned block; needs ETH_RPC_URL
+make check              # format, lint, build, tests, coverage and sizes; no RPC
+make test-fork          # mainnet fork at a pinned block; needs ETH_RPC_URL
+make predeploy-oracle   # full clean-tree release gate before oracle broadcast
+make predeploy-market   # full clean-tree release gate after oracle write-back
 ```
 
 The fork suite deploys the oracle through the production script path against live state, pins the

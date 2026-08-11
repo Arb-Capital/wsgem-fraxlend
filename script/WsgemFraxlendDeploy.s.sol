@@ -3,18 +3,14 @@
 pragma solidity ^0.8.28;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {VmSafe}           from "forge-std/Vm.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 
 import {WsgemFraxlendDualOracle} from "../src/WsgemFraxlendDualOracle.sol";
-import {IDualOracle}             from "../src/interfaces/IDualOracle.sol";
-import {IWsgem}                  from "../src/interfaces/IWsgem.sol";
-import {IChainlinkAggregator}    from "../src/interfaces/IChainlinkAggregator.sol";
-import {IDecimals}               from "../src/interfaces/IDecimals.sol";
-import {
-    IFraxlendPair,
-    IFraxlendPairDeployer,
-    IFraxlendWhitelist
-} from "../src/interfaces/IFraxlend.sol";
+import {IDualOracle} from "../src/interfaces/IDualOracle.sol";
+import {IWsgem} from "../src/interfaces/IWsgem.sol";
+import {IChainlinkAggregator} from "../src/interfaces/IChainlinkAggregator.sol";
+import {IDecimals} from "../src/interfaces/IDecimals.sol";
+import {IFraxlendPair, IFraxlendPairDeployer, IFraxlendWhitelist} from "../src/interfaces/IFraxlend.sol";
 
 /// @title  WsgemFraxlendConfig
 /// @notice Everything a wsgem FraxLend pair needs, and nothing that names one.
@@ -27,25 +23,25 @@ abstract contract WsgemFraxlendConfig {
 
     /// @dev Abstract rather than defaulted to 1. A default chain id is a preflight check that
     ///      passes because nobody set it, which is the opposite of what the check is for.
-    function CHAIN_ID()      public view virtual returns (uint256);
+    function CHAIN_ID() public view virtual returns (uint256);
     function PAIR_DEPLOYER() public view virtual returns (address);
-    function WHITELIST()     public view virtual returns (address);
+    function WHITELIST() public view virtual returns (address);
 
     // --- The oracle's wiring -------------------------------------------------------------------
 
-    function WSGEM()               public view virtual returns (address);
-    function GEM()                 public view virtual returns (address);
-    function ASSET()               public view virtual returns (address);
-    function GEM_USD_FEED()        public view virtual returns (address);
-    function GEM_USD_MAX_DELAY()   public view virtual returns (uint256);
-    function ASSET_USD_FEED()      public view virtual returns (address);
+    function WSGEM() public view virtual returns (address);
+    function GEM() public view virtual returns (address);
+    function ASSET() public view virtual returns (address);
+    function GEM_USD_FEED() public view virtual returns (address);
+    function GEM_USD_MAX_DELAY() public view virtual returns (uint256);
+    function ASSET_USD_FEED() public view virtual returns (address);
     function ASSET_USD_MAX_DELAY() public view virtual returns (uint256);
 
     /// @dev Also abstract, and deliberately so: the price fold is built from this number, so
     ///      inheriting it silently is how a quote at the wrong precision reaches a market. The
     ///      preflight cross-checks it against the gem's real `decimals()`.
     function QUOTE_DECIMALS() public view virtual returns (uint8);
-    function ORACLE_NAME()    public view virtual returns (string memory);
+    function ORACLE_NAME() public view virtual returns (string memory);
 
     /// @dev The deployed oracle. `address(0)` until the oracle target has broadcast and the
     ///      address has been written back into the instance file -- which is why the market target
@@ -60,11 +56,11 @@ abstract contract WsgemFraxlendConfig {
     // rate. These are proposals: the deploy() call is whitelist-gated, so the Frax team has final
     // say and runs the encoded bytes this repo prints.
 
-    function MAX_ORACLE_DEVIATION()     public view virtual returns (uint32);
-    function RATE_CONTRACT()            public view virtual returns (address);
-    function FULL_UTILIZATION_RATE()    public view virtual returns (uint64);
-    function MAX_LTV()                  public view virtual returns (uint256);
-    function LIQUIDATION_FEE()          public view virtual returns (uint256);
+    function MAX_ORACLE_DEVIATION() public view virtual returns (uint32);
+    function RATE_CONTRACT() public view virtual returns (address);
+    function FULL_UTILIZATION_RATE() public view virtual returns (uint64);
+    function MAX_LTV() public view virtual returns (uint256);
+    function LIQUIDATION_FEE() public view virtual returns (uint256);
     function PROTOCOL_LIQUIDATION_FEE() public view virtual returns (uint256);
 
     // --- Sanity band ---------------------------------------------------------------------------
@@ -90,8 +86,9 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
     /// @dev One Chainlink leg, probed with attribution: a preflight that let the raw revert
     ///      surface would name neither the feed nor the reason.
     function _feedAnswer(address feed_, string memory what_) internal view returns (uint256) {
-        try IChainlinkAggregator(feed_).latestRoundData()
-        returns (uint80, int256 answer_, uint256, uint256 updatedAt_, uint80) {
+        try IChainlinkAggregator(feed_).latestRoundData() returns (
+            uint80, int256 answer_, uint256, uint256 updatedAt_, uint80
+        ) {
             require(answer_ > 0, string.concat(what_, "-nonpositive"));
             // Heartbeat-scale comparison; a validator's few-second nudge decides nothing here.
             // forge-lint: disable-next-line(block-timestamp)
@@ -108,19 +105,20 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
     ///      independently of the deployed oracle's immutables -- so the post-deploy comparison is
     ///      a comparison and not a restatement.
     function _expectedPrices() internal view returns (uint256 low_, uint256 high_) {
-        uint256 burn_     = IWsgem(WSGEM()).burncost();
-        uint256 mint_     = IWsgem(WSGEM()).mintcost();
-        uint256 gemRaw_   = _feedAnswer(GEM_USD_FEED(), "preflight/gem-feed");
+        uint256 burn_ = IWsgem(WSGEM()).burncost();
+        uint256 mint_ = IWsgem(WSGEM()).mintcost();
+        uint256 gemRaw_ = _feedAnswer(GEM_USD_FEED(), "preflight/gem-feed");
         uint256 assetRaw_ = _feedAnswer(ASSET_USD_FEED(), "preflight/asset-feed");
 
         uint256 scale_ = 10
-            ** (36 + uint256(IDecimals(GEM()).decimals())
-                   + uint256(IChainlinkAggregator(GEM_USD_FEED()).decimals())
-                   - uint256(IDecimals(ASSET()).decimals())
-                   - uint256(IChainlinkAggregator(ASSET_USD_FEED()).decimals()));
+            ** (36
+                + uint256(IDecimals(GEM()).decimals())
+                + uint256(IChainlinkAggregator(GEM_USD_FEED()).decimals())
+                - uint256(IDecimals(ASSET()).decimals())
+                - uint256(IChainlinkAggregator(ASSET_USD_FEED()).decimals()));
 
         high_ = assetRaw_ * scale_ / (burn_ * gemRaw_);
-        low_  = assetRaw_ * scale_ / (mint_ * gemRaw_);
+        low_ = assetRaw_ * scale_ / (mint_ * gemRaw_);
         if (low_ > high_) (low_, high_) = (high_, low_);
     }
 
@@ -133,33 +131,30 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
     ///      `ORACLE()` is copied in by hand between two broadcasts, and this is the last moment a
     ///      wrong paste can be caught -- the oracle is immutable on the pair once deployed.
     function _assertOracle(WsgemFraxlendDualOracle oracle_) internal view {
-        require(address(oracle_.WSGEM())          == WSGEM(),                       "oracle/wsgem");
-        require(address(oracle_.PIP())            == IWsgem(WSGEM()).pip(),         "oracle/pip");
-        require(oracle_.GEM()                     == GEM(),                         "oracle/gem");
-        require(oracle_.ASSET()                   == ASSET(),                       "oracle/asset");
-        require(address(oracle_.GEM_USD_FEED())   == GEM_USD_FEED(),                "oracle/gem-feed");
-        require(oracle_.GEM_USD_MAX_DELAY()       == GEM_USD_MAX_DELAY(),           "oracle/gem-delay");
-        require(address(oracle_.ASSET_USD_FEED()) == ASSET_USD_FEED(),              "oracle/asset-feed");
-        require(oracle_.ASSET_USD_MAX_DELAY()     == ASSET_USD_MAX_DELAY(),         "oracle/asset-delay");
-        require(oracle_.QUOTE_DECIMALS()          == QUOTE_DECIMALS(),              "oracle/quote-decimals");
-        require(oracle_.BASE_TOKEN_0()            == address(840),                  "oracle/base-token");
-        require(oracle_.QUOTE_TOKEN_0()           == WSGEM(),                       "oracle/quote-token");
-        require(oracle_.decimals()                == 18,                            "oracle/decimals");
-        require(oracle_.supportsInterface(type(IDualOracle).interfaceId),           "oracle/interface");
-        require(
-            keccak256(bytes(oracle_.name())) == keccak256(bytes(ORACLE_NAME())),
-            "oracle/name"
-        );
+        require(address(oracle_.WSGEM()) == WSGEM(), "oracle/wsgem");
+        require(address(oracle_.PIP()) == IWsgem(WSGEM()).pip(), "oracle/pip");
+        require(oracle_.GEM() == GEM(), "oracle/gem");
+        require(oracle_.ASSET() == ASSET(), "oracle/asset");
+        require(address(oracle_.GEM_USD_FEED()) == GEM_USD_FEED(), "oracle/gem-feed");
+        require(oracle_.GEM_USD_MAX_DELAY() == GEM_USD_MAX_DELAY(), "oracle/gem-delay");
+        require(address(oracle_.ASSET_USD_FEED()) == ASSET_USD_FEED(), "oracle/asset-feed");
+        require(oracle_.ASSET_USD_MAX_DELAY() == ASSET_USD_MAX_DELAY(), "oracle/asset-delay");
+        require(oracle_.QUOTE_DECIMALS() == QUOTE_DECIMALS(), "oracle/quote-decimals");
+        require(oracle_.BASE_TOKEN_0() == address(840), "oracle/base-token");
+        require(oracle_.QUOTE_TOKEN_0() == WSGEM(), "oracle/quote-token");
+        require(oracle_.decimals() == 18, "oracle/decimals");
+        require(oracle_.supportsInterface(type(IDualOracle).interfaceId), "oracle/interface");
+        require(keccak256(bytes(oracle_.name())) == keccak256(bytes(ORACLE_NAME())), "oracle/name");
 
         (bool bad_, uint256 low_, uint256 high_) = oracle_.getPrices();
-        require(!bad_,          "oracle/bad-data");
-        require(low_ <= high_,  "oracle/unsorted");
-        require(low_ > 0,       "oracle/zero-price");
+        require(!bad_, "oracle/bad-data");
+        require(low_ <= high_, "oracle/unsorted");
+        require(low_ > 0, "oracle/zero-price");
 
         (uint256 expLow_, uint256 expHigh_) = _expectedPrices();
         require(low_ == expLow_ && high_ == expHigh_, "oracle/price-mismatch");
 
-        require(low_  >= MIN_PRICE(), "oracle/price-below-band");
+        require(low_ >= MIN_PRICE(), "oracle/price-below-band");
         require(high_ <= MAX_PRICE(), "oracle/price-above-band");
 
         // A spread past the pair's gate would not stop this deploy, but it would brick every
@@ -172,15 +167,15 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
     ///      live contract abi.decodes exactly this, 288 bytes.
     function _configData(address oracle_) internal view returns (bytes memory data_) {
         data_ = abi.encode(
-            ASSET(),                    // 1. asset
-            WSGEM(),                    // 2. collateral
-            oracle_,                    // 3. oracle
-            MAX_ORACLE_DEVIATION(),     // 4. uint32, 1e5 precision
-            RATE_CONTRACT(),            // 5. rate contract
-            FULL_UTILIZATION_RATE(),    // 6. uint64, per-second 1e18 rate
-            MAX_LTV(),                  // 7. 1e5 precision
-            LIQUIDATION_FEE(),          // 8. 1e5 precision ("clean"; dirty is derived at 90%)
-            PROTOCOL_LIQUIDATION_FEE()  // 9. 1e5 precision
+            ASSET(), // 1. asset
+            WSGEM(), // 2. collateral
+            oracle_, // 3. oracle
+            MAX_ORACLE_DEVIATION(), // 4. uint32, 1e5 precision
+            RATE_CONTRACT(), // 5. rate contract
+            FULL_UTILIZATION_RATE(), // 6. uint64, per-second 1e18 rate
+            MAX_LTV(), // 7. 1e5 precision
+            LIQUIDATION_FEE(), // 8. 1e5 precision ("clean"; dirty is derived at 90%)
+            PROTOCOL_LIQUIDATION_FEE() // 9. 1e5 precision
         );
         require(data_.length == 288, "configdata/length");
     }
@@ -192,29 +187,29 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
     function _preflightCommon() internal view {
         require(block.chainid == CHAIN_ID(), "preflight/wrong-chain");
 
-        _requireCode(WSGEM(),           "preflight/wsgem-not-a-contract");
-        _requireCode(GEM(),             "preflight/gem-not-a-contract");
-        _requireCode(ASSET(),           "preflight/asset-not-a-contract");
-        _requireCode(GEM_USD_FEED(),    "preflight/gem-feed-not-a-contract");
-        _requireCode(ASSET_USD_FEED(),  "preflight/asset-feed-not-a-contract");
+        _requireCode(WSGEM(), "preflight/wsgem-not-a-contract");
+        _requireCode(GEM(), "preflight/gem-not-a-contract");
+        _requireCode(ASSET(), "preflight/asset-not-a-contract");
+        _requireCode(GEM_USD_FEED(), "preflight/gem-feed-not-a-contract");
+        _requireCode(ASSET_USD_FEED(), "preflight/asset-feed-not-a-contract");
 
         require(WSGEM() != ASSET(), "preflight/collateral-is-asset");
 
         require(IWsgem(WSGEM()).gem() == GEM(), "preflight/gem-mismatch");
-        _requireCode(IWsgem(WSGEM()).pip(),     "preflight/pip-not-a-contract");
+        _requireCode(IWsgem(WSGEM()).pip(), "preflight/pip-not-a-contract");
 
-        require(IDecimals(WSGEM()).decimals() == 18,               "preflight/wsgem-decimals");
-        require(IDecimals(GEM()).decimals() == QUOTE_DECIMALS(),   "preflight/quote-decimals");
-        require(IDecimals(ASSET()).decimals() <= 18,               "preflight/asset-decimals");
-        require(bytes(ORACLE_NAME()).length <= 32,                 "preflight/name-too-long");
+        require(IDecimals(WSGEM()).decimals() == 18, "preflight/wsgem-decimals");
+        require(IDecimals(GEM()).decimals() == QUOTE_DECIMALS(), "preflight/quote-decimals");
+        require(IDecimals(ASSET()).decimals() <= 18, "preflight/asset-decimals");
+        require(bytes(ORACLE_NAME()).length <= 32, "preflight/name-too-long");
 
         require(IWsgem(WSGEM()).navprice() > 0, "preflight/pip-paused");
         require(IWsgem(WSGEM()).burncost() > 0, "preflight/burncost-zero");
         require(IWsgem(WSGEM()).mintcost() > 0, "preflight/mintcost-zero");
 
         (uint256 low_, uint256 high_) = _expectedPrices();
-        require(low_ > 0,             "preflight/price-zero");
-        require(low_  >= MIN_PRICE(), "preflight/price-below-band");
+        require(low_ > 0, "preflight/price-zero");
+        require(low_ >= MIN_PRICE(), "preflight/price-below-band");
         require(high_ <= MAX_PRICE(), "preflight/price-above-band");
     }
 }
@@ -291,10 +286,7 @@ abstract contract WsgemFraxlendMarketScript is WsgemFraxlendBase {
             // A simulation from an unwhitelisted sender is the hand-off path: the bytes above are
             // the deliverable. A BROADCAST from one would half-run -- sign nothing, deploy
             // nothing -- so it refuses loudly instead of exiting green.
-            require(
-                !vm.isContext(VmSafe.ForgeContext.ScriptBroadcast),
-                "deploy/sender-not-whitelisted"
-            );
+            require(!vm.isContext(VmSafe.ForgeContext.ScriptBroadcast), "deploy/sender-not-whitelisted");
             console2.log("sender is not on the FraxLend deployer whitelist; configData above is");
             console2.log("the hand-off artifact. No transaction was attempted.");
             return address(0);
@@ -323,7 +315,7 @@ abstract contract WsgemFraxlendMarketScript is WsgemFraxlendBase {
         _assertOracle(WsgemFraxlendDualOracle(ORACLE()));
 
         _requireCode(PAIR_DEPLOYER(), "preflight/deployer-not-a-contract");
-        _requireCode(WHITELIST(),     "preflight/whitelist-not-a-contract");
+        _requireCode(WHITELIST(), "preflight/whitelist-not-a-contract");
         _requireCode(RATE_CONTRACT(), "preflight/rate-contract-not-a-contract");
 
         // Version-pinned against a pasted predecessor: the v1 deployer at another address decodes
@@ -339,23 +331,17 @@ abstract contract WsgemFraxlendMarketScript is WsgemFraxlendBase {
     }
 
     function _assertPair(IFraxlendPair pair_) internal view virtual {
-        require(pair_.asset()              == ASSET(),                    "pair/asset");
-        require(pair_.collateralContract() == WSGEM(),                    "pair/collateral");
-        require(pair_.rateContract()       == RATE_CONTRACT(),            "pair/rate-contract");
-        require(pair_.maxLTV()             == MAX_LTV(),                  "pair/max-ltv");
-        require(pair_.cleanLiquidationFee() == LIQUIDATION_FEE(),         "pair/liquidation-fee");
-        require(
-            pair_.dirtyLiquidationFee() == LIQUIDATION_FEE() * 90_000 / 1e5,
-            "pair/dirty-liquidation-fee"
-        );
-        require(
-            pair_.protocolLiquidationFee() == PROTOCOL_LIQUIDATION_FEE(),
-            "pair/protocol-liquidation-fee"
-        );
+        require(pair_.asset() == ASSET(), "pair/asset");
+        require(pair_.collateralContract() == WSGEM(), "pair/collateral");
+        require(pair_.rateContract() == RATE_CONTRACT(), "pair/rate-contract");
+        require(pair_.maxLTV() == MAX_LTV(), "pair/max-ltv");
+        require(pair_.cleanLiquidationFee() == LIQUIDATION_FEE(), "pair/liquidation-fee");
+        require(pair_.dirtyLiquidationFee() == LIQUIDATION_FEE() * 90_000 / 1e5, "pair/dirty-liquidation-fee");
+        require(pair_.protocolLiquidationFee() == PROTOCOL_LIQUIDATION_FEE(), "pair/protocol-liquidation-fee");
 
         (address oracle_, uint32 maxDev_,, uint256 low_, uint256 high_) = pair_.exchangeRateInfo();
-        require(oracle_ == ORACLE(),                 "pair/oracle");
-        require(maxDev_ == MAX_ORACLE_DEVIATION(),   "pair/max-oracle-deviation");
+        require(oracle_ == ORACLE(), "pair/oracle");
+        require(maxDev_ == MAX_ORACLE_DEVIATION(), "pair/max-oracle-deviation");
 
         // The round-trip: the rates the pair stored on `updateExchangeRate()` are the rates the
         // oracle serves this block.

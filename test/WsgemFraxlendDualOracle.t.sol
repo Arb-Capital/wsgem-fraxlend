@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test}                    from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {WsgemFraxlendDualOracle} from "../src/WsgemFraxlendDualOracle.sol";
-import {IDualOracle, IERC165}    from "../src/interfaces/IDualOracle.sol";
-import {IWsgem}                  from "../src/interfaces/IWsgem.sol";
-import {IChainlinkAggregator}    from "../src/interfaces/IChainlinkAggregator.sol";
+import {IDualOracle, IERC165} from "../src/interfaces/IDualOracle.sol";
+import {IWsgem} from "../src/interfaces/IWsgem.sol";
+import {IChainlinkAggregator} from "../src/interfaces/IChainlinkAggregator.sol";
 import {MockPip, MockToken, MockWsgem} from "./mocks/MockWsgem.sol";
-import {MockChainlinkFeed}             from "./mocks/MockChainlinkFeed.sol";
+import {MockChainlinkFeed} from "./mocks/MockChainlinkFeed.sol";
 
 /// @notice The dual oracle over mocked feeds.
 /// @dev The worked fixture runs at the exact magnitudes the live wstGBP/frxUSD deployment will
@@ -18,25 +18,25 @@ import {MockChainlinkFeed}             from "./mocks/MockChainlinkFeed.sol";
 ///      and deserve to fail loudly on their own.
 contract WsgemFraxlendDualOracleTest is Test {
     // The live wstGBP/frxUSD magnitudes, as read from mainnet, and the hand-derived expectations.
-    uint256 internal constant NAV0  = 1007380025597183628;  // 18-dp gem per wsgem
-    uint256 internal constant BURN0 = 1004861575533190669;  // NAV net of a 25 bp exit spread
-    uint256 internal constant MINT0 = 1007380025597183628;  // zero issuance spread on the live wsgem
-    int256  internal constant GBP0  = 135133000;            // 8-dp Chainlink GBP/USD
-    int256  internal constant FRX0  = 100005313;            // 8-dp Chainlink frxUSD/USD
-    uint256 internal constant GBPU  = 135133000;            // the same two, unsigned, for expected-
-    uint256 internal constant FRXU  = 100005313;            // value arithmetic without casts
+    uint256 internal constant NAV0 = 1007380025597183628; // 18-dp gem per wsgem
+    uint256 internal constant BURN0 = 1004861575533190669; // NAV net of a 25 bp exit spread
+    uint256 internal constant MINT0 = 1007380025597183628; // zero issuance spread on the live wsgem
+    int256 internal constant GBP0 = 135133000; // 8-dp Chainlink GBP/USD
+    int256 internal constant FRX0 = 100005313; // 8-dp Chainlink frxUSD/USD
+    uint256 internal constant GBPU = 135133000; // the same two, unsigned, for expected-
+    uint256 internal constant FRXU = 100005313; // value arithmetic without casts
 
     // price = assetRaw * 1e36 / (quote * gemRaw), floor -- derived by hand from the constants
     // above. 7.36e17 collateral per 1e18 asset, i.e. wstGBP ~= $1.3579.
-    uint256 internal constant HIGH0 = 736470601548539699;   // through BURN0
-    uint256 internal constant LOW0  = 734629425044668350;   // through MINT0
+    uint256 internal constant HIGH0 = 736470601548539699; // through BURN0
+    uint256 internal constant LOW0 = 734629425044668350; // through MINT0
 
-    uint256 internal constant DELAY = 86700;                // heartbeat + 300, both legs
+    uint256 internal constant DELAY = 86700; // heartbeat + 300, both legs
 
-    MockPip           internal pip;
-    MockToken         internal gem;
-    MockToken         internal asset;
-    MockWsgem         internal wsgem;
+    MockPip internal pip;
+    MockToken internal gem;
+    MockToken internal asset;
+    MockWsgem internal wsgem;
     MockChainlinkFeed internal gemFeed;
     MockChainlinkFeed internal assetFeed;
 
@@ -44,14 +44,14 @@ contract WsgemFraxlendDualOracleTest is Test {
 
     function setUp() public {
         vm.warp(1_800_000_000);
-        pip       = new MockPip(NAV0);
-        gem       = new MockToken(18);
-        asset     = new MockToken(18);
-        wsgem     = new MockWsgem(address(gem), address(pip), 18);
-        gemFeed   = new MockChainlinkFeed(GBP0, 8);
+        pip = new MockPip(NAV0);
+        gem = new MockToken(18);
+        asset = new MockToken(18);
+        wsgem = new MockWsgem(address(gem), address(pip), 18);
+        gemFeed = new MockChainlinkFeed(GBP0, 8);
         assetFeed = new MockChainlinkFeed(FRX0, 8);
         wsgem.setQuotes(NAV0, BURN0, MINT0);
-        oracle    = _deploy();
+        oracle = _deploy();
     }
 
     function _deploy() internal returns (WsgemFraxlendDualOracle) {
@@ -70,16 +70,16 @@ contract WsgemFraxlendDualOracleTest is Test {
     // --- Construction: wiring ------------------------------------------------------------------
 
     function test_constructionWiresEveryImmutable() public view {
-        assertEq(address(oracle.WSGEM()),          address(wsgem));
-        assertEq(address(oracle.PIP()),            address(pip));
-        assertEq(oracle.GEM(),                     address(gem));
-        assertEq(oracle.ASSET(),                   address(asset));
-        assertEq(address(oracle.GEM_USD_FEED()),   address(gemFeed));
-        assertEq(oracle.GEM_USD_MAX_DELAY(),       DELAY);
+        assertEq(address(oracle.WSGEM()), address(wsgem));
+        assertEq(address(oracle.PIP()), address(pip));
+        assertEq(oracle.GEM(), address(gem));
+        assertEq(oracle.ASSET(), address(asset));
+        assertEq(address(oracle.GEM_USD_FEED()), address(gemFeed));
+        assertEq(oracle.GEM_USD_MAX_DELAY(), DELAY);
         assertEq(address(oracle.ASSET_USD_FEED()), address(assetFeed));
-        assertEq(oracle.ASSET_USD_MAX_DELAY(),     DELAY);
-        assertEq(oracle.QUOTE_DECIMALS(),          18);
-        assertEq(oracle.ORACLE_PRECISION(),        1e18);
+        assertEq(oracle.ASSET_USD_MAX_DELAY(), DELAY);
+        assertEq(oracle.QUOTE_DECIMALS(), 18);
+        assertEq(oracle.ORACLE_PRECISION(), 1e18);
     }
 
     function test_theFoldedScaleIsExactlyOneE36ForTheAllStandardDecimals() public view {
@@ -88,19 +88,19 @@ contract WsgemFraxlendDualOracleTest is Test {
     }
 
     function test_theMetadataFollowsTheFraxConvention() public view {
-        assertEq(oracle.BASE_TOKEN_0(),           address(840));
-        assertEq(oracle.BASE_TOKEN_0_DECIMALS(),  18);
-        assertEq(oracle.BASE_TOKEN_1(),           address(840));
-        assertEq(oracle.BASE_TOKEN_1_DECIMALS(),  18);
-        assertEq(oracle.QUOTE_TOKEN_0(),          address(wsgem));
+        assertEq(oracle.BASE_TOKEN_0(), address(840));
+        assertEq(oracle.BASE_TOKEN_0_DECIMALS(), 18);
+        assertEq(oracle.BASE_TOKEN_1(), address(840));
+        assertEq(oracle.BASE_TOKEN_1_DECIMALS(), 18);
+        assertEq(oracle.QUOTE_TOKEN_0(), address(wsgem));
         assertEq(oracle.QUOTE_TOKEN_0_DECIMALS(), 18);
-        assertEq(oracle.QUOTE_TOKEN_1(),          address(wsgem));
+        assertEq(oracle.QUOTE_TOKEN_1(), address(wsgem));
         assertEq(oracle.QUOTE_TOKEN_1_DECIMALS(), 18);
-        assertEq(oracle.NORMALIZATION_0(),        int256(0));
-        assertEq(oracle.NORMALIZATION_1(),        int256(0));
+        assertEq(oracle.NORMALIZATION_0(), int256(0));
+        assertEq(oracle.NORMALIZATION_1(), int256(0));
         assertEq(oracle.CHAINLINK_FEED_ADDRESS(), address(gemFeed));
-        assertEq(oracle.decimals(),               18);
-        assertEq(oracle.name(),                   "wsgem/stable DualOracle");
+        assertEq(oracle.decimals(), 18);
+        assertEq(oracle.name(), "wsgem/stable DualOracle");
     }
 
     // --- Construction: guards ------------------------------------------------------------------
@@ -108,42 +108,78 @@ contract WsgemFraxlendDualOracleTest is Test {
     function test_constructionRejectsEveryZeroAddress() public {
         vm.expectRevert(WsgemFraxlendDualOracle.ZeroAddress.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(0)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 18, "x"
+            IWsgem(address(0)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            18,
+            "x"
         );
 
         vm.expectRevert(WsgemFraxlendDualOracle.ZeroAddress.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(0), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 18, "x"
+            IWsgem(address(wsgem)),
+            address(0),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            18,
+            "x"
         );
 
         vm.expectRevert(WsgemFraxlendDualOracle.ZeroAddress.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(asset), IChainlinkAggregator(address(0)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 18, "x"
+            IWsgem(address(wsgem)),
+            address(asset),
+            IChainlinkAggregator(address(0)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            18,
+            "x"
         );
 
         vm.expectRevert(WsgemFraxlendDualOracle.ZeroAddress.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(0)), DELAY, 18, "x"
+            IWsgem(address(wsgem)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(0)),
+            DELAY,
+            18,
+            "x"
         );
 
         MockWsgem gemless_ = new MockWsgem(address(0), address(pip), 18);
         gemless_.setQuotes(NAV0, BURN0, MINT0);
         vm.expectRevert(WsgemFraxlendDualOracle.ZeroAddress.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(gemless_)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 18, "x"
+            IWsgem(address(gemless_)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            18,
+            "x"
         );
 
         MockWsgem pipless_ = new MockWsgem(address(gem), address(0), 18);
         pipless_.setQuotes(NAV0, BURN0, MINT0);
         vm.expectRevert(WsgemFraxlendDualOracle.ZeroAddress.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(pipless_)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 18, "x"
+            IWsgem(address(pipless_)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            18,
+            "x"
         );
     }
 
@@ -156,57 +192,105 @@ contract WsgemFraxlendDualOracleTest is Test {
     function test_constructionRejectsOversizedDecimalsOnEveryLeg() public {
         vm.expectRevert(WsgemFraxlendDualOracle.UnsupportedDecimals.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 19, "x"
+            IWsgem(address(wsgem)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            19,
+            "x"
         );
 
         MockToken wide_ = new MockToken(19);
         vm.expectRevert(WsgemFraxlendDualOracle.UnsupportedDecimals.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(wide_), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 18, "x"
+            IWsgem(address(wsgem)),
+            address(wide_),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            18,
+            "x"
         );
 
         MockChainlinkFeed wideGemFeed_ = new MockChainlinkFeed(GBP0, 19);
         vm.expectRevert(WsgemFraxlendDualOracle.UnsupportedDecimals.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(asset), IChainlinkAggregator(address(wideGemFeed_)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 18, "x"
+            IWsgem(address(wsgem)),
+            address(asset),
+            IChainlinkAggregator(address(wideGemFeed_)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            18,
+            "x"
         );
 
         MockChainlinkFeed wideAssetFeed_ = new MockChainlinkFeed(FRX0, 19);
         vm.expectRevert(WsgemFraxlendDualOracle.UnsupportedDecimals.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(wideAssetFeed_)), DELAY, 18, "x"
+            IWsgem(address(wsgem)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(wideAssetFeed_)),
+            DELAY,
+            18,
+            "x"
         );
     }
 
     function test_constructionRejectsDelaysOutsideTheRails() public {
         vm.expectRevert(WsgemFraxlendDualOracle.DelayOutOfBounds.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(asset), IChainlinkAggregator(address(gemFeed)), 1 hours - 1,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 18, "x"
+            IWsgem(address(wsgem)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            1 hours - 1,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            18,
+            "x"
         );
 
         vm.expectRevert(WsgemFraxlendDualOracle.DelayOutOfBounds.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), 7 days + 1, 18, "x"
+            IWsgem(address(wsgem)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            7 days + 1,
+            18,
+            "x"
         );
     }
 
     function test_constructionAcceptsExactlyThirtyTwoBytesOfNameAndNotThirtyThree() public {
         WsgemFraxlendDualOracle ok_ = new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 18, "abcdefghijklmnopqrstuvwxyz123456"
+            IWsgem(address(wsgem)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            18,
+            "abcdefghijklmnopqrstuvwxyz123456"
         );
         assertEq(ok_.name(), "abcdefghijklmnopqrstuvwxyz123456");
 
         vm.expectRevert(WsgemFraxlendDualOracle.NameTooLong.selector);
         new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 18, "abcdefghijklmnopqrstuvwxyz1234567"
+            IWsgem(address(wsgem)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            18,
+            "abcdefghijklmnopqrstuvwxyz1234567"
         );
     }
 
@@ -241,42 +325,48 @@ contract WsgemFraxlendDualOracleTest is Test {
         (bool bad_, uint256 low_, uint256 high_) = oracle.getPrices();
         assertFalse(bad_);
         assertEq(high_, HIGH0);
-        assertEq(low_,  LOW0);
+        assertEq(low_, LOW0);
     }
 
     function test_burncostMapsToPriceHighAndMintcostToPriceLow() public {
         // A wide, unambiguous spread so the mapping cannot pass by accident of magnitude.
-        uint256 burn_ = 0.90e18;
-        uint256 mint_ = 1.10e18;
+        uint256 burn_ = 0.9e18;
+        uint256 mint_ = 1.1e18;
         wsgem.setQuotes(NAV0, burn_, mint_);
 
         (, uint256 low_, uint256 high_) = oracle.getPrices();
         assertEq(high_, FRXU * 1e36 / (burn_ * GBPU));
-        assertEq(low_,  FRXU * 1e36 / (mint_ * GBPU));
+        assertEq(low_, FRXU * 1e36 / (mint_ * GBPU));
         assertGt(high_, low_);
     }
 
     function test_aFlippedSpreadStillComesBackSorted() public {
         // The two spreads are independently settable upstream, so mint < burn is reachable. The
         // pair's deviation gate assumes low <= high; the oracle sorts rather than trusts.
-        wsgem.setQuotes(NAV0, 1.10e18, 0.90e18);
+        wsgem.setQuotes(NAV0, 1.1e18, 0.9e18);
 
         (, uint256 low_, uint256 high_) = oracle.getPrices();
         assertLe(low_, high_);
-        assertEq(high_, FRXU * 1e36 / (0.90e18 * GBPU));
+        assertEq(high_, FRXU * 1e36 / (0.9e18 * GBPU));
     }
 
     function test_aSameCurrencyMarketCancelsTheFxLegExactly() public {
         // One feed on both legs: the currency conversion must vanish from the composed price,
         // leaving the pure collateral-per-asset inversion of the wsgem quote.
         WsgemFraxlendDualOracle same_ = new WsgemFraxlendDualOracle(
-            IWsgem(address(wsgem)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(gemFeed)), DELAY, 18, "wsgem/gem DualOracle"
+            IWsgem(address(wsgem)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            18,
+            "wsgem/gem DualOracle"
         );
 
         (, uint256 low_, uint256 high_) = same_.getPrices();
         assertEq(high_, 1e36 / BURN0);
-        assertEq(low_,  1e36 / MINT0);
+        assertEq(low_, 1e36 / MINT0);
     }
 
     function test_theLiveSpreadSitsFarInsideAFivePercentDeviationGate() public view {
@@ -288,11 +378,11 @@ contract WsgemFraxlendDualOracleTest is Test {
     }
 
     function test_getPricesNormalizedIsTheIdentityHere() public view {
-        (bool bad_, uint256 low_, uint256 high_)   = oracle.getPrices();
+        (bool bad_, uint256 low_, uint256 high_) = oracle.getPrices();
         (bool nBad_, uint256 nLow_, uint256 nHigh_) = oracle.getPricesNormalized();
-        assertEq(nLow_,  low_);
+        assertEq(nLow_, low_);
         assertEq(nHigh_, high_);
-        assertEq(nBad_,  bad_);
+        assertEq(nBad_, bad_);
     }
 
     // --- Prices: staleness ---------------------------------------------------------------------
@@ -434,9 +524,9 @@ contract WsgemFraxlendDualOracleTest is Test {
         uint8 assetDec_,
         uint8 assetFeedDec_
     ) public {
-        quoteDec_     = uint8(bound(quoteDec_, 0, 18));
-        gemFeedDec_   = uint8(bound(gemFeedDec_, 0, 18));
-        assetDec_     = uint8(bound(assetDec_, 0, 18));
+        quoteDec_ = uint8(bound(quoteDec_, 0, 18));
+        gemFeedDec_ = uint8(bound(gemFeedDec_, 0, 18));
+        assetDec_ = uint8(bound(assetDec_, 0, 18));
         assetFeedDec_ = uint8(bound(assetFeedDec_, 0, 18));
 
         // Unit-scale values at each leg's claimed decimals, so the constructor's live self-check
@@ -444,30 +534,33 @@ contract WsgemFraxlendDualOracleTest is Test {
         // refuse, and is not what this test is about).
         MockWsgem fWsgem_ = new MockWsgem(address(gem), address(pip), 18);
         fWsgem_.setQuotes(NAV0, 10 ** uint256(quoteDec_), 10 ** uint256(quoteDec_));
-        MockToken fAsset_          = new MockToken(assetDec_);
-        MockChainlinkFeed fGem_    = new MockChainlinkFeed(int256(10 ** uint256(gemFeedDec_)), gemFeedDec_);
+        MockToken fAsset_ = new MockToken(assetDec_);
+        MockChainlinkFeed fGem_ = new MockChainlinkFeed(int256(10 ** uint256(gemFeedDec_)), gemFeedDec_);
         MockChainlinkFeed fAssetF_ = new MockChainlinkFeed(int256(10 ** uint256(assetFeedDec_)), assetFeedDec_);
 
         WsgemFraxlendDualOracle o_ = new WsgemFraxlendDualOracle(
-            IWsgem(address(fWsgem_)), address(fAsset_), IChainlinkAggregator(address(fGem_)), DELAY,
-            IChainlinkAggregator(address(fAssetF_)), DELAY, quoteDec_, "x"
+            IWsgem(address(fWsgem_)),
+            address(fAsset_),
+            IChainlinkAggregator(address(fGem_)),
+            DELAY,
+            IChainlinkAggregator(address(fAssetF_)),
+            DELAY,
+            quoteDec_,
+            "x"
         );
 
-        uint256 expected_ = 10
-            ** (36 + uint256(quoteDec_) + uint256(gemFeedDec_)
-                   - uint256(assetDec_) - uint256(assetFeedDec_));
+        uint256 expected_ =
+            10 ** (36 + uint256(quoteDec_) + uint256(gemFeedDec_) - uint256(assetDec_) - uint256(assetFeedDec_));
         assertEq(o_.PRICE_SCALE(), expected_);
     }
 
     /// @dev The defining property of the floor division, checked from outside the contract:
     ///      price * denominator <= numerator < (price + 1) * denominator.
-    function testFuzz_theFloorDivisionBoundHolds(uint256 burn_, uint256 mint_, uint256 gem_, uint256 frx_)
-        public
-    {
+    function testFuzz_theFloorDivisionBoundHolds(uint256 burn_, uint256 mint_, uint256 gem_, uint256 frx_) public {
         burn_ = bound(burn_, 0.01e18, 1e24);
         mint_ = bound(mint_, burn_, 1e24);
-        gem_  = bound(gem_, 1e6, 1e12);   // 8-dp fiat feed, $0.01 to $10,000
-        frx_  = bound(frx_, 1e6, 1e12);
+        gem_ = bound(gem_, 1e6, 1e12); // 8-dp fiat feed, $0.01 to $10,000
+        frx_ = bound(frx_, 1e6, 1e12);
 
         wsgem.setQuotes(NAV0, burn_, mint_);
         // Bounded to [1e6, 1e12] above, far below int256's sign bit.
@@ -478,7 +571,7 @@ contract WsgemFraxlendDualOracleTest is Test {
 
         (, uint256 low_, uint256 high_) = oracle.getPrices();
 
-        uint256 num_  = frx_ * 1e36;
+        uint256 num_ = frx_ * 1e36;
         uint256 hDen_ = burn_ * gem_;
         uint256 lDen_ = mint_ * gem_;
         assertLe(high_ * hDen_, num_);
@@ -500,13 +593,19 @@ contract WsgemFraxlendDualOracleTest is Test {
         MockWsgem sixWsgem_ = new MockWsgem(address(gem), address(pip), 18);
         sixWsgem_.setQuotes(NAV0, quoteWad_ / 1e12, quoteWad_ / 1e12);
         WsgemFraxlendDualOracle six_ = new WsgemFraxlendDualOracle(
-            IWsgem(address(sixWsgem_)), address(asset), IChainlinkAggregator(address(gemFeed)), DELAY,
-            IChainlinkAggregator(address(assetFeed)), DELAY, 6, "x"
+            IWsgem(address(sixWsgem_)),
+            address(asset),
+            IChainlinkAggregator(address(gemFeed)),
+            DELAY,
+            IChainlinkAggregator(address(assetFeed)),
+            DELAY,
+            6,
+            "x"
         );
         (, uint256 low6_, uint256 high6_) = six_.getPrices();
 
         assertEq(high6_, high18_);
-        assertEq(low6_,  low18_);
+        assertEq(low6_, low18_);
     }
 
     /// @dev Whatever the two quotes do, the pair the oracle returns is sorted and nonzero.

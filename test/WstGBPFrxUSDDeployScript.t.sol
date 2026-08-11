@@ -18,21 +18,21 @@ contract ConfigDataHarness is WstGBPFrxUSDMarketScript {
 ///      legacy FRAX and its feed are each one paste away from a silently mispriced market.
 contract WstGBPFrxUSDDeployScriptTest is Test, WstGBPFrxUSDConstants {
     function test_theChainAndInfrastructureConstantsAreTheMainnetOnes() public pure {
-        assertEq(CHAIN_ID(),      1);
+        assertEq(CHAIN_ID(), 1);
         assertEq(PAIR_DEPLOYER(), 0xF767A82a188305461b6f01a7706f7Bc0ba941ffF);
-        assertEq(WHITELIST(),     0xDc1cf6863b6100468479fE7dd3D2D1cDe7775265);
+        assertEq(WHITELIST(), 0xDc1cf6863b6100468479fE7dd3D2D1cDe7775265);
     }
 
     function test_theOracleWiringConstantsMatchTheInstanceSheet() public pure {
-        assertEq(WSGEM(),               0x57C3571f10767E49C9d7b60feb6c67804783B7aE);
-        assertEq(GEM(),                 0x27f6c8289550fCE67f6B50BeD1F519966aFE5287);
-        assertEq(ASSET(),               0xCAcd6fd266aF91b8AeD52aCCc382b4e165586E29);
-        assertEq(GEM_USD_FEED(),        0x5c0Ab2d9b5a7ed9f470386e82BB36A3613cDd4b5);
-        assertEq(ASSET_USD_FEED(),      0x9B4a96210bc8D9D55b1908B465D8B0de68B7fF83);
-        assertEq(GEM_USD_MAX_DELAY(),   86_700);
+        assertEq(WSGEM(), 0x57C3571f10767E49C9d7b60feb6c67804783B7aE);
+        assertEq(GEM(), 0x27f6c8289550fCE67f6B50BeD1F519966aFE5287);
+        assertEq(ASSET(), 0xCAcd6fd266aF91b8AeD52aCCc382b4e165586E29);
+        assertEq(GEM_USD_FEED(), 0x5c0Ab2d9b5a7ed9f470386e82BB36A3613cDd4b5);
+        assertEq(ASSET_USD_FEED(), 0x9B4a96210bc8D9D55b1908B465D8B0de68B7fF83);
+        assertEq(GEM_USD_MAX_DELAY(), 86_700);
         assertEq(ASSET_USD_MAX_DELAY(), 86_700);
-        assertEq(QUOTE_DECIMALS(),      18);
-        assertEq(ORACLE_NAME(),         "wstGBP/frxUSD DualOracle");
+        assertEq(QUOTE_DECIMALS(), 18);
+        assertEq(ORACLE_NAME(), "frxUSD/wstGBP DualOracle");
     }
 
     function test_theOracleWriteBackSlotStartsUnset() public view {
@@ -50,12 +50,13 @@ contract WstGBPFrxUSDDeployScriptTest is Test, WstGBPFrxUSDConstants {
         assertLe(bytes(ORACLE_NAME()).length, 32);
     }
 
-    function test_thePairParametersMatchTheReferencePair() public pure {
-        assertEq(MAX_ORACLE_DEVIATION(),     5_000);
-        assertEq(RATE_CONTRACT(),            0x987a96c6637cF7E7B369BA7C1110d5fB69fb2d17);
-        assertEq(FULL_UTILIZATION_RATE(),    9_494_822_760);
-        assertEq(MAX_LTV(),                  75_000);
-        assertEq(LIQUIDATION_FEE(),          5_000);
+    function test_theReviewedPairParameterProposalIsPinned() public pure {
+        // The 5% deviation gate is an intentional tightening from the reference pair's live 10%.
+        assertEq(MAX_ORACLE_DEVIATION(), 5_000);
+        assertEq(RATE_CONTRACT(), 0x987a96c6637cF7E7B369BA7C1110d5fB69fb2d17);
+        assertEq(FULL_UTILIZATION_RATE(), 9_494_822_760);
+        assertEq(MAX_LTV(), 75_000);
+        assertEq(LIQUIDATION_FEE(), 5_000);
         assertEq(PROTOCOL_LIQUIDATION_FEE(), 2_000);
     }
 
@@ -73,15 +74,15 @@ contract WstGBPFrxUSDDeployScriptTest is Test, WstGBPFrxUSDConstants {
         address oracle_ = address(0xBEEF);
 
         bytes memory expected_ = abi.encode(
-            0xCAcd6fd266aF91b8AeD52aCCc382b4e165586E29,      // asset: frxUSD
-            0x57C3571f10767E49C9d7b60feb6c67804783B7aE,      // collateral: wstGBP
-            oracle_,                                         // oracle
-            uint32(5_000),                                   // maxOracleDeviation
-            0x987a96c6637cF7E7B369BA7C1110d5fB69fb2d17,      // rateContract: Variable Rate V3
-            uint64(9_494_822_760),                           // fullUtilizationRate
-            uint256(75_000),                                 // maxLTV
-            uint256(5_000),                                  // liquidationFee (clean)
-            uint256(2_000)                                   // protocolLiquidationFee
+            0xCAcd6fd266aF91b8AeD52aCCc382b4e165586E29, // asset: frxUSD
+            0x57C3571f10767E49C9d7b60feb6c67804783B7aE, // collateral: wstGBP
+            oracle_, // oracle
+            uint32(5_000), // maxOracleDeviation
+            0x987a96c6637cF7E7B369BA7C1110d5fB69fb2d17, // rateContract: Variable Rate V3
+            uint64(9_494_822_760), // fullUtilizationRate
+            uint256(75_000), // maxLTV
+            uint256(5_000), // liquidationFee (clean)
+            uint256(2_000) // protocolLiquidationFee
         );
 
         bytes memory actual_ = harness_.configData(oracle_);

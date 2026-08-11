@@ -13,7 +13,7 @@ contract MockPip {
     }
 
     uint256 public price;
-    Mode    public mode;
+    Mode public mode;
 
     constructor(uint256 price_) {
         price = price_;
@@ -56,16 +56,16 @@ contract MockWsgem {
 
     address public gem;
     address public pip;
-    uint8   public decimals;
-    Mode    public mode;
+    uint8 public decimals;
+    Mode public mode;
 
     uint256 internal _navprice;
     uint256 internal _burncost;
     uint256 internal _mintcost;
 
     constructor(address gem_, address pip_, uint8 decimals_) {
-        gem      = gem_;
-        pip      = pip_;
+        gem = gem_;
+        pip = pip_;
         decimals = decimals_;
     }
 

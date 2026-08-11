@@ -36,5 +36,5 @@ authoritative constants (pinned by the test suite); this sheet is for humans and
 | Contract | Address | Why it matters here |
 |---|---|---|
 | KrwqDualOracle | `0xd84cCBd42046AA35c7d408A92872F0253aEDF030` | the live structural analogue; source of the registered `IDualOracle` id `0x415f1303`, pinned by the fork suite |
-| frxUSD/KRWQ pair (#71) | `0x00C242cA3Ef5c2CB909ed3eD972B6f24624B4337` | the configData reference this instance's pair parameters mirror |
+| frxUSD/KRWQ pair (#71) | `0x00C242cA3Ef5c2CB909ed3eD972B6f24624B4337` | configData baseline; this proposal deliberately tightens its live 10% oracle-deviation gate to 5% |
 | wstGBP burncost aggregator (8 dp) | `0xF7493C2739c2b1bF5E6bB0e5b16A265Ed0B400B0` | sibling repo's Chainlink shim; publishes burncost only, which is why this oracle reads the token directly |

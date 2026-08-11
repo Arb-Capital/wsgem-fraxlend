@@ -80,10 +80,7 @@ interface IFraxlendPair {
     function userBorrowShares(address user) external view returns (uint256);
     function userCollateralBalance(address user) external view returns (uint256);
     function totalBorrow() external view returns (uint128 amount, uint128 shares);
-    function toBorrowAmount(uint256 shares, bool roundUp, bool previewInterest)
-        external
-        view
-        returns (uint256 amount);
+    function toBorrowAmount(uint256 shares, bool roundUp, bool previewInterest) external view returns (uint256 amount);
 }
 
 /// @title IERC20Minimal

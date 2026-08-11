@@ -2,11 +2,7 @@
 // Copyright (c) 2026 Arb Capital
 pragma solidity ^0.8.28;
 
-import {
-    WsgemFraxlendConfig,
-    WsgemFraxlendOracleScript,
-    WsgemFraxlendMarketScript
-} from "./WsgemFraxlendDeploy.s.sol";
+import {WsgemFraxlendConfig, WsgemFraxlendOracleScript, WsgemFraxlendMarketScript} from "./WsgemFraxlendDeploy.s.sol";
 
 /// @title  WstGBPFrxUSDConstants
 /// @notice The wstGBP-collateral / frxUSD-asset instance. This file (with docs/) is the only
@@ -94,7 +90,7 @@ abstract contract WstGBPFrxUSDConstants is WsgemFraxlendConfig {
 
     /// @dev 24 bytes; the oracle packs it into one immutable word (32-byte cap).
     function ORACLE_NAME() public pure virtual override returns (string memory) {
-        return "wstGBP/frxUSD DualOracle";
+        return "frxUSD/wstGBP DualOracle";
     }
 
     /// @dev Write-back slot: `address(0)` until `make oracle-deploy INSTANCE=WstGBPFrxUSD` has
@@ -109,9 +105,10 @@ abstract contract WstGBPFrxUSDConstants is WsgemFraxlendConfig {
 
     // --- The pair's configData -----------------------------------------------------------------
     //
-    // Matched to the live frxUSD/KRWQ reference pair (registry #71) -- the newest fiat-pegged
+    // Based on the live frxUSD/KRWQ reference pair (registry #71) -- the newest fiat-pegged
     // 18-decimal collateral on the v5 deployer, and the closest structural relative of this
-    // market. The Frax team has final say on all five; these are the proposal.
+    // market. The 5% deviation gate is deliberately stricter than the reference pair's live 10%;
+    // the other risk parameters follow it. The Frax team has final say on all five.
 
     /// @dev 5% at 1e5 precision. The oracle's own low/high spread is the wrapper's mint/burn
     ///      band, ~25 bp today, so the everyday deviation sits two orders inside the gate; the

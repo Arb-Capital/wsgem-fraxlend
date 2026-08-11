@@ -3,11 +3,11 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {WsgemFraxlendDualOracle}   from "../../src/WsgemFraxlendDualOracle.sol";
-import {IDualOracle, IERC165}      from "../../src/interfaces/IDualOracle.sol";
-import {IWsgem}                    from "../../src/interfaces/IWsgem.sol";
-import {IChainlinkAggregator}      from "../../src/interfaces/IChainlinkAggregator.sol";
-import {WstGBPFrxUSDOracleScript}  from "../../script/WstGBPFrxUSD.s.sol";
+import {WsgemFraxlendDualOracle} from "../../src/WsgemFraxlendDualOracle.sol";
+import {IDualOracle, IERC165} from "../../src/interfaces/IDualOracle.sol";
+import {IWsgem} from "../../src/interfaces/IWsgem.sol";
+import {IChainlinkAggregator} from "../../src/interfaces/IChainlinkAggregator.sol";
+import {WstGBPFrxUSDOracleScript} from "../../script/WstGBPFrxUSD.s.sol";
 
 /// @notice The oracle deployed against live mainnet state, through the production script path.
 /// @dev `run()` is exercised whole -- preflight, broadcast, wiring assertions, report -- because
@@ -16,13 +16,13 @@ import {WstGBPFrxUSDOracleScript}  from "../../script/WstGBPFrxUSD.s.sol";
 ///      untested until the broadcast that matters.
 contract WstGBPFrxUSDOracleForkTest is Test {
     // The live addresses, retyped from the instance sheet (docs/instances/wstgbp-frxusd.md).
-    address internal constant WSTGBP       = 0x57C3571f10767E49C9d7b60feb6c67804783B7aE;
-    address internal constant GBP_USD      = 0x5c0Ab2d9b5a7ed9f470386e82BB36A3613cDd4b5;
-    address internal constant FRXUSD_USD   = 0x9B4a96210bc8D9D55b1908B465D8B0de68B7fF83;
+    address internal constant WSTGBP = 0x57C3571f10767E49C9d7b60feb6c67804783B7aE;
+    address internal constant GBP_USD = 0x5c0Ab2d9b5a7ed9f470386e82BB36A3613cDd4b5;
+    address internal constant FRXUSD_USD = 0x9B4a96210bc8D9D55b1908B465D8B0de68B7fF83;
 
     /// @dev The live frxUSD/KRWQ dual oracle -- the deployed reference this repo's IDualOracle
     ///      declaration is pinned against.
-    address internal constant KRWQ_ORACLE  = 0xd84cCBd42046AA35c7d408A92872F0253aEDF030;
+    address internal constant KRWQ_ORACLE = 0xd84cCBd42046AA35c7d408A92872F0253aEDF030;
 
     WsgemFraxlendDualOracle internal oracle;
 
@@ -44,7 +44,7 @@ contract WstGBPFrxUSDOracleForkTest is Test {
         (, uint256 low_, uint256 high_) = oracle.getPrices();
 
         // Collateral-per-asset: wstGBP above par against a ~$1.35 GBP prices well under 1e18.
-        assertGt(low_,  4e17);
+        assertGt(low_, 4e17);
         assertLt(high_, 1e18);
 
         assertLt(1e5 * (high_ - low_) / high_, 5_000);
@@ -66,7 +66,7 @@ contract WstGBPFrxUSDOracleForkTest is Test {
 
         (, uint256 low_, uint256 high_) = oracle.getPrices();
         assertEq(high_, frxRaw_ * 1e36 / (burn_ * gbpRaw_));
-        assertEq(low_,  frxRaw_ * 1e36 / (mint_ * gbpRaw_));
+        assertEq(low_, frxRaw_ * 1e36 / (mint_ * gbpRaw_));
     }
 
     function test_theInterfaceIdMatchesWhatTheLiveReferenceOracleRegisters() public view {
@@ -79,18 +79,18 @@ contract WstGBPFrxUSDOracleForkTest is Test {
     }
 
     function test_theNormalizedPricesAreTheRawPricesForAnEighteenDecimalCollateral() public view {
-        (, uint256 low_, uint256 high_)   = oracle.getPrices();
+        (, uint256 low_, uint256 high_) = oracle.getPrices();
         (, uint256 nLow_, uint256 nHigh_) = oracle.getPricesNormalized();
-        assertEq(nLow_,  low_);
+        assertEq(nLow_, low_);
         assertEq(nHigh_, high_);
     }
 
     function test_theMetadataReadsAsTheInstanceSheetSays() public view {
-        assertEq(oracle.name(),                   "wstGBP/frxUSD DualOracle");
-        assertEq(oracle.QUOTE_TOKEN_0(),          WSTGBP);
-        assertEq(oracle.BASE_TOKEN_0(),           address(840));
+        assertEq(oracle.name(), "frxUSD/wstGBP DualOracle");
+        assertEq(oracle.QUOTE_TOKEN_0(), WSTGBP);
+        assertEq(oracle.BASE_TOKEN_0(), address(840));
         assertEq(oracle.CHAINLINK_FEED_ADDRESS(), GBP_USD);
-        assertEq(oracle.PRICE_SCALE(),            1e36);
-        assertEq(oracle.decimals(),               18);
+        assertEq(oracle.PRICE_SCALE(), 1e36);
+        assertEq(oracle.decimals(), 18);
     }
 }

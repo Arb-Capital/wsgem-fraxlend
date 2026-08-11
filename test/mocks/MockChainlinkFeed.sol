@@ -12,27 +12,27 @@ contract MockChainlinkFeed {
         REVERTING
     }
 
-    int256  public answer;
+    int256 public answer;
     uint256 public updatedAt;
-    uint8   public decimals;
-    Mode    public mode;
+    uint8 public decimals;
+    Mode public mode;
 
     constructor(int256 answer_, uint8 decimals_) {
-        answer    = answer_;
-        decimals  = decimals_;
+        answer = answer_;
+        decimals = decimals_;
         updatedAt = block.timestamp;
     }
 
     /// @notice Publish a round now.
     function set(int256 answer_) external {
-        answer    = answer_;
+        answer = answer_;
         updatedAt = block.timestamp;
     }
 
     /// @notice Publish a round stamped at an arbitrary time -- how staleness (and a future stamp)
     ///         is driven.
     function setAt(int256 answer_, uint256 updatedAt_) external {
-        answer    = answer_;
+        answer = answer_;
         updatedAt = updatedAt_;
     }
 

@@ -2,11 +2,11 @@
 // Copyright (c) 2026 Arb Capital
 pragma solidity ^0.8.28;
 
-import {IDualOracle, IERC165}  from "./interfaces/IDualOracle.sol";
-import {IWsgem}                from "./interfaces/IWsgem.sol";
-import {IPip}                  from "./interfaces/IPip.sol";
-import {IChainlinkAggregator}  from "./interfaces/IChainlinkAggregator.sol";
-import {IDecimals}             from "./interfaces/IDecimals.sol";
+import {IDualOracle, IERC165} from "./interfaces/IDualOracle.sol";
+import {IWsgem} from "./interfaces/IWsgem.sol";
+import {IPip} from "./interfaces/IPip.sol";
+import {IChainlinkAggregator} from "./interfaces/IChainlinkAggregator.sol";
+import {IDecimals} from "./interfaces/IDecimals.sol";
 
 /// @title  WsgemFraxlendDualOracle
 /// @author Arb Capital
@@ -179,22 +179,22 @@ contract WsgemFraxlendDualOracle is IDualOracle {
     /// @param quoteDecimals_    Decimals of `wsgem_.burncost()`, i.e. the gem's decimals, <= 18.
     /// @param name_             Oracle name, at most 32 bytes. Immutable.
     constructor(
-        IWsgem               wsgem_,
-        address              asset_,
+        IWsgem wsgem_,
+        address asset_,
         IChainlinkAggregator gemUsdFeed_,
-        uint256              gemUsdMaxDelay_,
+        uint256 gemUsdMaxDelay_,
         IChainlinkAggregator assetUsdFeed_,
-        uint256              assetUsdMaxDelay_,
-        uint8                quoteDecimals_,
-        string memory        name_
+        uint256 assetUsdMaxDelay_,
+        uint8 quoteDecimals_,
+        string memory name_
     ) {
-        if (address(wsgem_) == address(0))        revert ZeroAddress();
-        if (asset_ == address(0))                 revert ZeroAddress();
-        if (address(gemUsdFeed_) == address(0))   revert ZeroAddress();
+        if (address(wsgem_) == address(0)) revert ZeroAddress();
+        if (asset_ == address(0)) revert ZeroAddress();
+        if (address(gemUsdFeed_) == address(0)) revert ZeroAddress();
         if (address(assetUsdFeed_) == address(0)) revert ZeroAddress();
-        if (bytes(name_).length > 32)             revert NameTooLong();
+        if (bytes(name_).length > 32) revert NameTooLong();
 
-        if (gemUsdMaxDelay_   < _MIN_DELAY || gemUsdMaxDelay_   > _MAX_DELAY) revert DelayOutOfBounds();
+        if (gemUsdMaxDelay_ < _MIN_DELAY || gemUsdMaxDelay_ > _MAX_DELAY) revert DelayOutOfBounds();
         if (assetUsdMaxDelay_ < _MIN_DELAY || assetUsdMaxDelay_ > _MAX_DELAY) revert DelayOutOfBounds();
 
         address gem_ = wsgem_.gem();
@@ -204,43 +204,42 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         // The collateral leg of the FraxLend price is served at the collateral's own decimals,
         // and the fold below pins that term to 18; a wsgem is 18-decimal by construction, but a
         // wrong address here must not become a silently mis-scaled market.
-        if (wsgem_.decimals() != 18)         revert UnsupportedDecimals();
-        if (quoteDecimals_ > _MAX_DECIMALS)  revert UnsupportedDecimals();
+        if (wsgem_.decimals() != 18) revert UnsupportedDecimals();
+        if (quoteDecimals_ > _MAX_DECIMALS) revert UnsupportedDecimals();
 
-        uint8 assetDec_     = IDecimals(asset_).decimals();
-        uint8 gemFeedDec_   = gemUsdFeed_.decimals();
+        uint8 assetDec_ = IDecimals(asset_).decimals();
+        uint8 gemFeedDec_ = gemUsdFeed_.decimals();
         uint8 assetFeedDec_ = assetUsdFeed_.decimals();
-        if (assetDec_ > _MAX_DECIMALS)     revert UnsupportedDecimals();
-        if (gemFeedDec_ > _MAX_DECIMALS)   revert UnsupportedDecimals();
+        if (assetDec_ > _MAX_DECIMALS) revert UnsupportedDecimals();
+        if (gemFeedDec_ > _MAX_DECIMALS) revert UnsupportedDecimals();
         if (assetFeedDec_ > _MAX_DECIMALS) revert UnsupportedDecimals();
 
         // Every term is bounded to [0, 18] above, so the exponent sits in [0, 72] and the
         // subtraction cannot underflow: 36 + quoteDec + gemFeedDec >= 36 >= assetDec + assetFeedDec.
-        uint256 scale_ = 10
-            ** (36 + uint256(quoteDecimals_) + uint256(gemFeedDec_)
-                   - uint256(assetDec_)      - uint256(assetFeedDec_));
+        uint256 scale_ =
+            10 ** (36 + uint256(quoteDecimals_) + uint256(gemFeedDec_) - uint256(assetDec_) - uint256(assetFeedDec_));
 
-        WSGEM               = wsgem_;
-        PIP                 = IPip(pip_);
-        GEM                 = gem_;
-        ASSET               = asset_;
-        GEM_USD_FEED        = gemUsdFeed_;
-        GEM_USD_MAX_DELAY   = gemUsdMaxDelay_;
-        ASSET_USD_FEED      = assetUsdFeed_;
+        WSGEM = wsgem_;
+        PIP = IPip(pip_);
+        GEM = gem_;
+        ASSET = asset_;
+        GEM_USD_FEED = gemUsdFeed_;
+        GEM_USD_MAX_DELAY = gemUsdMaxDelay_;
+        ASSET_USD_FEED = assetUsdFeed_;
         ASSET_USD_MAX_DELAY = assetUsdMaxDelay_;
-        QUOTE_DECIMALS      = quoteDecimals_;
-        PRICE_SCALE         = scale_;
+        QUOTE_DECIMALS = quoteDecimals_;
+        PRICE_SCALE = scale_;
 
-        BASE_TOKEN_0           = _USD;
-        BASE_TOKEN_0_DECIMALS  = 18;
-        BASE_TOKEN_1           = _USD;
-        BASE_TOKEN_1_DECIMALS  = 18;
-        QUOTE_TOKEN_0          = address(wsgem_);
+        BASE_TOKEN_0 = _USD;
+        BASE_TOKEN_0_DECIMALS = 18;
+        BASE_TOKEN_1 = _USD;
+        BASE_TOKEN_1_DECIMALS = 18;
+        QUOTE_TOKEN_0 = address(wsgem_);
         QUOTE_TOKEN_0_DECIMALS = 18;
-        QUOTE_TOKEN_1          = address(wsgem_);
+        QUOTE_TOKEN_1 = address(wsgem_);
         QUOTE_TOKEN_1_DECIMALS = 18;
-        NORMALIZATION_0        = 0;
-        NORMALIZATION_1        = 0;
+        NORMALIZATION_0 = 0;
+        NORMALIZATION_1 = 0;
         CHAINLINK_FEED_ADDRESS = address(gemUsdFeed_);
 
         // Length-checked to <= 32 above, so no character is dropped; a shorter string is
@@ -263,19 +262,13 @@ contract WsgemFraxlendDualOracle is IDualOracle {
     ///      the failure policy. `isBadData` is always false: this oracle refuses rather than
     ///      warns, because the pair's deviation gate cannot see a staleness both legs share.
     function getPrices() public view returns (bool isBadData, uint256 priceLow, uint256 priceHigh) {
-        return _compose(
-            PIP, WSGEM, GEM_USD_FEED, GEM_USD_MAX_DELAY, ASSET_USD_FEED, ASSET_USD_MAX_DELAY, PRICE_SCALE
-        );
+        return _compose(PIP, WSGEM, GEM_USD_FEED, GEM_USD_MAX_DELAY, ASSET_USD_FEED, ASSET_USD_MAX_DELAY, PRICE_SCALE);
     }
 
     /// @inheritdoc IDualOracle
     /// @dev The identity here: the price is already at 18 decimals because the collateral is
     ///      (NORMALIZATION is zero). Present because Frax tooling reads it.
-    function getPricesNormalized()
-        external
-        view
-        returns (bool isBadData, uint256 priceLow, uint256 priceHigh)
-    {
+    function getPricesNormalized() external view returns (bool isBadData, uint256 priceLow, uint256 priceHigh) {
         return getPrices();
     }
 
@@ -308,13 +301,13 @@ contract WsgemFraxlendDualOracle is IDualOracle {
     ///      burncost` is an expectation, not an invariant, and the pair's deviation gate assumes
     ///      `priceLow <= priceHigh`.
     function _compose(
-        IPip                 pip_,
-        IWsgem               wsgem_,
+        IPip pip_,
+        IWsgem wsgem_,
         IChainlinkAggregator gemFeed_,
-        uint256              gemDelay_,
+        uint256 gemDelay_,
         IChainlinkAggregator assetFeed_,
-        uint256              assetDelay_,
-        uint256              scale_
+        uint256 assetDelay_,
+        uint256 scale_
     ) internal view returns (bool isBadData_, uint256 priceLow_, uint256 priceHigh_) {
         if (pip_.read() == 0) revert OraclePaused();
 
@@ -322,7 +315,7 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         uint256 mint_ = wsgem_.mintcost();
         if (burn_ == 0 || mint_ == 0) revert InvalidQuote();
 
-        uint256 gemRaw_   = _readFeed(gemFeed_,   gemDelay_);
+        uint256 gemRaw_ = _readFeed(gemFeed_, gemDelay_);
         uint256 assetRaw_ = _readFeed(assetFeed_, assetDelay_);
         isBadData_ = false;
 
@@ -331,7 +324,7 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         // 1e18 scale the +-1 wei is noise against the wrapper's spread, and directional-rounding
         // theater on top of a sorted pair earns nothing.
         priceHigh_ = assetRaw_ * scale_ / (burn_ * gemRaw_);
-        priceLow_  = assetRaw_ * scale_ / (mint_ * gemRaw_);
+        priceLow_ = assetRaw_ * scale_ / (mint_ * gemRaw_);
 
         if (priceLow_ > priceHigh_) (priceLow_, priceHigh_) = (priceHigh_, priceLow_);
         // A zero exchange rate reads as infinitely valuable collateral to the pair's LTV math.
@@ -346,8 +339,8 @@ contract WsgemFraxlendDualOracle is IDualOracle {
     function _readFeed(IChainlinkAggregator feed_, uint256 maxDelay_) internal view returns (uint256 raw_) {
         (, int256 answer_,, uint256 updatedAt_,) = feed_.latestRoundData();
 
-        if (answer_ <= 0)     revert InvalidFeedAnswer();
-        if (updatedAt_ == 0)  revert InvalidFeedAnswer();
+        if (answer_ <= 0) revert InvalidFeedAnswer();
+        if (updatedAt_ == 0) revert InvalidFeedAnswer();
         // A validator can nudge a timestamp by seconds; both comparisons here operate at
         // feed-heartbeat scale (hours), where that nudge decides nothing.
         // forge-lint: disable-next-line(block-timestamp)
@@ -366,7 +359,9 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         while (len_ < 32 && b32_[len_] != 0) len_++;
 
         bytes memory out_ = new bytes(len_);
-        for (uint256 i_; i_ < len_; i_++) out_[i_] = b32_[i_];
+        for (uint256 i_; i_ < len_; i_++) {
+            out_[i_] = b32_[i_];
+        }
 
         return string(out_);
     }

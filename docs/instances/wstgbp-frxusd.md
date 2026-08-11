@@ -12,8 +12,10 @@ deployer. Constants live in `script/WstGBPFrxUSD.s.sol` and are pinned byte-for-
 | 2. Frax whitelisting review | pending step 1 | — |
 | 3. FraxLend pair | pending steps 1–2 | — |
 
-After step 1: write the oracle address into `ORACLE()` in `script/WstGBPFrxUSD.s.sol`, verify the
-source on Etherscan, and update this table.
+After step 1: write the oracle address into `ORACLE()` in `script/WstGBPFrxUSD.s.sol`, change
+`test_theOracleWriteBackSlotStartsUnset` to pin that exact address, verify the source on Etherscan,
+and update this table. Follow the evidence and recovery checklist in
+[the deployment runbook](../deployment-runbook.md).
 
 ## The oracle's wiring
 
@@ -27,7 +29,7 @@ source on Etherscan, and update this table.
 | max delays | 86,700 s both legs | Frax convention: heartbeat + 300 s; immutable (ownerless) |
 | quote decimals | 18 | tGBP's decimals — the scale of `burncost()`/`mintcost()` |
 | `PRICE_SCALE` | 1e36 | `10^(36 − 18 − 8 + 18 + 8)`; see docs/00-design.md §1 |
-| name | `wstGBP/frxUSD DualOracle` | 24 bytes, single immutable word |
+| name | `frxUSD/wstGBP DualOracle` | 24 bytes; follows Fraxlend's collateral-per-asset output direction |
 
 ## Live worked numbers (block 25,730,000, the fork-test pin)
 
@@ -50,15 +52,17 @@ magnitude outside it and fails the preflight.
 
 ## Proposed pair configData
 
-Matched to the live frxUSD/KRWQ reference pair (`0x00C242cA3Ef5c2CB909ed3eD972B6f24624B4337`,
-registry #71) — the newest fiat-pegged 18-decimal collateral on the v5 deployer:
+Based on the live frxUSD/KRWQ reference pair (`0x00C242cA3Ef5c2CB909ed3eD972B6f24624B4337`,
+registry #71), the newest fiat-pegged 18-decimal collateral on the v5 deployer. The proposal
+intentionally tightens `maxOracleDeviation` from the reference pair's live 10% to 5%; the other
+listed risk parameters follow the reference configuration:
 
 | Field | Value | Meaning |
 |---|---|---|
 | asset | frxUSD (above) | the token lent |
 | collateral | wstGBP (above) | the token pledged |
 | oracle | *step-1 address* | this repo's dual oracle |
-| maxOracleDeviation | 5,000 | 5% at 1e5; everyday deviation is ~250 |
+| maxOracleDeviation | 5,000 | Intentional 5% gate, stricter than the reference pair's live 10%; everyday deviation is ~250 |
 | rateContract | `0x987a96c6637cF7E7B369BA7C1110d5fB69fb2d17` | Variable Rate V3, as on every current frxUSD pair |
 | fullUtilizationRate | 9,494,822,760 | ~30% APR seed at full utilization (per-second, 1e18) |
 | maxLTV | 75,000 | 75% at 1e5 |
@@ -89,9 +93,12 @@ FraxLend `deploy()` is whitelist-gated, so this is a request to review the oracl
    `deploy()` with these exact bytes on a mainnet fork (whitelisted sender impersonated, deployer
    seeded), then exercises borrows at the LTV bound, the deviation gate, the pause freeze, and a
    liquidation against the resulting pair.
-6. **One operational prerequisite**: wstGBP transfers are compliance-gated; the gate must allow
-   the pair address to hold the token before the market can custody collateral (same arrangement
-   as the token's other lending deployments).
+6. **Deployment funding**: the v5 deployer must hold Frax's configured frxUSD seed before calling
+   `deploy(configData)`. Its balance was zero during the 2026-08-11 pre-deployment review, so Frax
+   must fund it immediately before deployment and confirm the required seed amount.
+7. **Compliance prerequisite**: wstGBP transfers are compliance-gated; the gate must allow the
+   resulting pair address to hold the token before the market can custody collateral (the same
+   arrangement as the token's other lending deployments).
 
 ## Related deployments of the same collateral
 
