@@ -7,7 +7,17 @@ import {WsgemFraxlendDualOracle} from "../../src/WsgemFraxlendDualOracle.sol";
 import {IDualOracle, IERC165} from "../../src/interfaces/IDualOracle.sol";
 import {IWsgem} from "../../src/interfaces/IWsgem.sol";
 import {IChainlinkAggregator} from "../../src/interfaces/IChainlinkAggregator.sol";
-import {WstGBPFrxUSDOracleScript} from "../../script/WstGBPFrxUSD.s.sol";
+import {WstGBPFrxUSDOracleScript, WstGBPFrxUSDConstants} from "../../script/WstGBPFrxUSD.s.sol";
+import {WsgemFraxlendConfig} from "../../script/WsgemFraxlendDeploy.s.sol";
+
+/// @dev Replays the pre-write-back state: `ORACLE()` now records the 2026-08-11 deployment and
+///      the production oracle script refuses a second one, but this rehearsal exists to re-walk
+///      that original deployment path against live state.
+contract OracleScriptHarness is WstGBPFrxUSDOracleScript {
+    function ORACLE() public pure override(WsgemFraxlendConfig, WstGBPFrxUSDConstants) returns (address) {
+        return address(0);
+    }
+}
 
 /// @notice The oracle deployed against live mainnet state, through the production script path.
 /// @dev Exercises the script path used by `make oracle-deploy`, including preflight and
@@ -26,7 +36,7 @@ contract WstGBPFrxUSDOracleForkTest is Test {
 
     function setUp() public {
         vm.createSelectFork(vm.envString("ETH_RPC_URL"), vm.envUint("ETH_FORK_BLOCK"));
-        oracle = (new WstGBPFrxUSDOracleScript()).run();
+        oracle = (new OracleScriptHarness()).run();
     }
 
     function test_theProductionScriptPathDeploysAndSelfAsserts() public view {
@@ -43,7 +53,7 @@ contract WstGBPFrxUSDOracleForkTest is Test {
         // active. With no new rounds on the pinned fork, the preflight names the first stale leg
         // before any broadcast begins.
         vm.warp(block.timestamp + 7 days);
-        WstGBPFrxUSDOracleScript script_ = new WstGBPFrxUSDOracleScript();
+        OracleScriptHarness script_ = new OracleScriptHarness();
         vm.expectRevert(bytes("preflight/gem-feed-stale"));
         script_.run();
     }

@@ -8,13 +8,17 @@ deployer. Constants live in `script/WstGBPFrxUSD.s.sol` and are pinned byte-for-
 
 | Step | Status | Address |
 |---|---|---|
-| 1. `WsgemFraxlendDualOracle` | **not yet deployed** — run `make oracle-deploy INSTANCE=WstGBPFrxUSD` | — |
-| 2. Frax whitelisting review | pending step 1 | — |
-| 3. FraxLend pair | pending steps 1–2 | — |
+| 1. `WsgemFraxlendDualOracle` | **deployed** 2026-08-11, block 25,736,263; [source verified](https://etherscan.io/address/0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407#code) | [`0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407`](https://etherscan.io/address/0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407) |
+| 2. Frax whitelisting review | **next** — send the hand-off package below | — |
+| 3. FraxLend pair | pending step 2 | — |
 
-After step 1: write the oracle address into `ORACLE()` in `script/WstGBPFrxUSD.s.sol`, change
-`test_theOracleWriteBackSlotStartsUnset` to pin that exact address, verify the source on Etherscan,
-and update this table. Follow the evidence and recovery checklist in
+Step 1's deployment transaction is
+`0xf408d18c4dda25eed43aea4b5906e85b47fb3ff82861027d5dfee85f3b5dd921`; at deployment the oracle
+reported `getPrices()` → `(false, 734141221132615161, 735981174067784622)`, deviation 249/1e5.
+The write-back is committed: `ORACLE()` in `script/WstGBPFrxUSD.s.sol` records the address and
+`test_theOracleWriteBackSlotPinsTheDeployedAddress` pins it. Next: run
+`make predeploy-market INSTANCE=WstGBPFrxUSD` and send the printed configData with the hand-off
+below, following the evidence and recovery checklist in
 [the deployment runbook](../deployment-runbook.md).
 
 ## The oracle's wiring
@@ -61,7 +65,7 @@ listed risk parameters follow the reference configuration:
 |---|---|---|
 | asset | frxUSD (above) | the token lent |
 | collateral | wstGBP (above) | the token pledged |
-| oracle | *step-1 address* | this repo's dual oracle |
+| oracle | `0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407` | this repo's dual oracle (step 1, above) |
 | maxOracleDeviation | 5,000 | Intentional 5% gate, stricter than the reference pair's live 10%; everyday deviation is ~250 |
 | rateContract | `0x987a96c6637cF7E7B369BA7C1110d5fB69fb2d17` | Variable Rate V3, as on every current frxUSD pair |
 | fullUtilizationRate | 9,494,822,760 | ~30% APR seed at full utilization (per-second, 1e18) |
@@ -78,7 +82,9 @@ bytes in the pin suite and accepted by the real deployer in the fork rehearsal.
 FraxLend `deploy()` is whitelist-gated, so this is a request to review the oracle and either run
 `deploy(configData)` from a whitelisted sender or whitelist ours. The package:
 
-1. **Oracle address + verified source** (from step 1; Etherscan link).
+1. **Oracle address + verified source**:
+   [`0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407`](https://etherscan.io/address/0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407#code)
+   (deployed 2026-08-11, block 25,736,263).
 2. **What it is**: an ownerless, stateless `IDualOracle` (id `0x415f1303`, ERC-165-registered).
    `priceHigh` = wstGBP's on-chain redemption quote × Chainlink GBP/USD ÷ Chainlink frxUSD/USD,
    inverted to collateral-per-asset; `priceLow` = the same through the issuance quote. No owner,
@@ -86,8 +92,9 @@ FraxLend `deploy()` is whitelist-gated, so this is a request to review the oracl
    served as the last price with `isBadData = true`, preserving withdrawals, repayments and
    liquidations if publication stops. The Frax warning is advisory, so new borrowing also remains
    possible at that stale FX price. Data from which no valid price can be formed still reverts.
-3. **Sample output**: `getPrices()` at block 25,730,000 → `(false, 734035945961033381,
-   735875635048655018)`; deviation 249/1e5.
+3. **Sample output**: `getPrices()` at the deployment block 25,736,263 → `(false,
+   734141221132615161, 735981174067784622)`; at the fork-test pin block 25,730,000 → `(false,
+   734035945961033381, 735875635048655018)`; deviation 249/1e5 at both.
 4. **The configData** (from `make configdata`), field-decoded as in the table above.
 5. **Rehearsal evidence**: `test/fork/WstGBPFrxUSDPair.fork.t.sol` runs the v5 deployer's
    `deploy()` with these exact bytes on a mainnet fork (whitelisted sender impersonated, deployer
@@ -108,4 +115,4 @@ FraxLend `deploy()` is whitelist-gated, so this is a request to review the oracl
 | Morpho Blue | `MorphoChainlinkOracleV2` over the 8-dp burncost aggregator `0xF7493C2739c2b1bF5E6bB0e5b16A265Ed0B400B0` | live |
 | LlamaLend (crvUSD) | `WsgemLlamalendOracle` `0xdc85a32D5B93e040A4e84401D567DcE02237557C` | live |
 | LlamaLend (frxUSD) | `WsgemFxLlamalendOracle` | dry-run only |
-| FraxLend (frxUSD) | this repo | pre-deploy |
+| FraxLend (frxUSD) | `WsgemFraxlendDualOracle` `0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407` (this repo) | oracle live; pair pending Frax review |

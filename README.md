@@ -2,7 +2,11 @@
 
 An ownerless [FraxLend](https://docs.frax.finance/fraxlend/fraxlend-overview) dual oracle for
 wsgem collateral against a USD-stable asset, plus the pair-deployment scripting around it. First
-instance: **wstGBP collateral / frxUSD asset** on Ethereum mainnet.
+instance: **wstGBP collateral / frxUSD asset** on Ethereum mainnet — its oracle is live and
+verified at
+[`0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407`](https://etherscan.io/address/0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407#code);
+the pair awaits Frax's whitelisted deployment
+(see [docs/instances/wstgbp-frxusd.md](docs/instances/wstgbp-frxusd.md)).
 
 ## What the oracle is
 

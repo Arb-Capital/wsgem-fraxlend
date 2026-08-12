@@ -86,12 +86,14 @@ abstract contract WstGBPFrxUSDConstants is WsgemFraxlendConfig {
         return "frxUSD/wstGBP DualOracle";
     }
 
-    /// @dev Write-back slot: `address(0)` until `make oracle-deploy INSTANCE=WstGBPFrxUSD` has
-    ///      broadcast, then the deployed address is committed here. The market target requires a
-    ///      nonzero value and the oracle target requires zero. This getter remains `view` so fork
-    ///      tests can override it with a deployed test oracle.
+    /// @dev Write-back slot, committed after `make oracle-deploy INSTANCE=WstGBPFrxUSD`: deployed
+    ///      2026-08-11 at block 25,736,263, tx
+    ///      0xf408d18c4dda25eed43aea4b5906e85b47fb3ff82861027d5dfee85f3b5dd921, source verified on
+    ///      Etherscan. The market target requires this nonzero value; the oracle target now
+    ///      refuses to run. This getter remains `view` so fork tests can override it with a
+    ///      test-deployed oracle.
     function ORACLE() public view virtual override returns (address) {
-        return address(0);
+        return 0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407;
     }
 
     // --- The pair's configData -----------------------------------------------------------------

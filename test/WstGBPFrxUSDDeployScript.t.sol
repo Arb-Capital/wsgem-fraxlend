@@ -34,10 +34,10 @@ contract WstGBPFrxUSDDeployScriptTest is Test, WstGBPFrxUSDConstants {
         assertEq(ORACLE_NAME(), "frxUSD/wstGBP DualOracle");
     }
 
-    function test_theOracleWriteBackSlotStartsUnset() public view {
-        // Flips to the deployed address after `make oracle-deploy`; until then the market target
-        // must refuse to run, and the oracle target must be willing to.
-        assertEq(ORACLE(), address(0));
+    function test_theOracleWriteBackSlotPinsTheDeployedAddress() public view {
+        // Written back after `make oracle-deploy` (2026-08-11, block 25,736,263). The market
+        // target requires it; the oracle target refuses a second deployment while it is set.
+        assertEq(ORACLE(), 0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407);
     }
 
     function test_theAssetIsFrxUsdAndNotLegacyFrax() public pure {

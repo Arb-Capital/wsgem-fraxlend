@@ -21,6 +21,12 @@ authoritative constants (pinned by the test suite); this sheet is for humans and
 | frxUSD/USD | `0x9B4a96210bc8D9D55b1908B465D8B0de68B7fF83` | 8 dp / 24 h / 0.5% |
 | legacy FRAX/USD — **do not use** | `0xB9E1E3A9feFf48998E45Fa90847ed4D467E8BcfD` | negative-pinned in the test suite |
 
+## This repo's deployments
+
+| Contract | Address | Notes |
+|---|---|---|
+| `WsgemFraxlendDualOracle` (wstGBP/frxUSD) | `0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407` | deployed 2026-08-11, block 25,736,263; source verified; ownerless, stateless — see the [instance sheet](../instances/wstgbp-frxusd.md) |
+
 ## FraxLend infrastructure
 
 | Contract | Address | Notes |
