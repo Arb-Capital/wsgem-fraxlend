@@ -523,10 +523,9 @@ contract WsgemFraxlendDualOracleTest is Test {
 
     // --- ERC-165 -------------------------------------------------------------------------------
 
-    function test_theInterfaceIdIsTheOneTheLiveReferenceOracleRegisters() public pure {
-        // 0x415f1303 was read off the deployed frxUSD/KRWQ oracle's supportsInterface on mainnet;
-        // the fork suite re-checks against the live contract. If this pin breaks, the local
-        // IDualOracle declaration has drifted from what Frax's tooling probes for.
+    function test_theInterfaceIdMatchesTheExpectedFraxLendId() public pure {
+        // If this pin breaks, the local IDualOracle declaration has drifted from the interface id
+        // expected by FraxLend tooling.
         assertEq(type(IDualOracle).interfaceId, bytes4(0x415f1303));
     }
 

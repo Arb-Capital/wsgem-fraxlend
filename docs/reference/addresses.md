@@ -36,11 +36,3 @@ authoritative constants (pinned by the test suite); this sheet is for humans and
 | FraxlendPairRegistry | `0xD6E9D27C75Afd88ad24Cd5EdccdC76fd2fc3A751` | pairs registered at deploy |
 | Variable Rate V3 | `0x987a96c6637cF7E7B369BA7C1110d5fB69fb2d17` | the rate contract on every current frxUSD pair |
 | Frax timelock | `0x8412ebf45bAC1B340BbE8F318b928C466c4E39CA` | governs live pairs' oracle/parameter changes |
-
-## Reference deployments (for comparison, not consumption)
-
-| Contract | Address | Why it matters here |
-|---|---|---|
-| KrwqDualOracle | `0xd84cCBd42046AA35c7d408A92872F0253aEDF030` | the live structural analogue; source of the registered `IDualOracle` id `0x415f1303`, pinned by the fork suite |
-| frxUSD/KRWQ pair (#71) | `0x00C242cA3Ef5c2CB909ed3eD972B6f24624B4337` | configData baseline; this proposal uses a 5% oracle-deviation gate instead of its live 10% |
-| wstGBP burncost aggregator (8 dp) | `0xF7493C2739c2b1bF5E6bB0e5b16A265Ed0B400B0` | sibling repo's Chainlink shim; publishes burncost only, which is why this oracle reads the token directly |

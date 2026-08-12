@@ -56,17 +56,15 @@ magnitude outside it and fails the preflight.
 
 ## Proposed pair configData
 
-Based on the live frxUSD/KRWQ reference pair (`0x00C242cA3Ef5c2CB909ed3eD972B6f24624B4337`,
-registry #71), the newest fiat-pegged 18-decimal collateral on the v5 deployer. The proposal
-intentionally tightens `maxOracleDeviation` from the reference pair's live 10% to 5%; the other
-listed risk parameters follow the reference configuration:
+The proposed parameters set a 5% `maxOracleDeviation`, comfortably above the wrapper's ordinary
+~25 bp mint/burn spread while still halting new borrowing if that spread widens materially:
 
 | Field | Value | Meaning |
 |---|---|---|
 | asset | frxUSD (above) | the token lent |
 | collateral | wstGBP (above) | the token pledged |
 | oracle | `0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407` | this repo's dual oracle (step 1, above) |
-| maxOracleDeviation | 5,000 | Intentional 5% gate, stricter than the reference pair's live 10%; everyday deviation is ~250 |
+| maxOracleDeviation | 5,000 | 5% gate; everyday deviation is ~250 |
 | rateContract | `0x987a96c6637cF7E7B369BA7C1110d5fB69fb2d17` | Variable Rate V3, as on every current frxUSD pair |
 | fullUtilizationRate | 9,494,822,760 | ~30% APR seed at full utilization (per-second, 1e18) |
 | maxLTV | 75,000 | 75% at 1e5 |
@@ -107,12 +105,3 @@ FraxLend `deploy()` is whitelist-gated, so this is a request to review the oracl
    (default-allow; wstGBP does not control it), so no allowlisting step is needed for the pair.
    The residual cases are remote but worth knowing: a banlisted address cannot receive seized
    collateral, and a banlisted pair would freeze collateral movement.
-
-## Related deployments of the same collateral
-
-| Venue | Oracle | Status |
-|---|---|---|
-| Morpho Blue | `MorphoChainlinkOracleV2` over the 8-dp burncost aggregator `0xF7493C2739c2b1bF5E6bB0e5b16A265Ed0B400B0` | live |
-| LlamaLend (crvUSD) | `WsgemLlamalendOracle` `0xdc85a32D5B93e040A4e84401D567DcE02237557C` | live |
-| LlamaLend (frxUSD) | `WsgemFxLlamalendOracle` | dry-run only |
-| FraxLend (frxUSD) | `WsgemFraxlendDualOracle` `0xA15A2aF6CaA24d0057b5EEFAcc2046E5161Da407` (this repo) | oracle live; pair pending Frax review |

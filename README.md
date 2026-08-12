@@ -101,6 +101,6 @@ make predeploy-market   # full clean-tree release gate after oracle write-back
 ```
 
 The fork suite deploys the oracle through the production script path against live state, pins the
-`IDualOracle` interface id against Frax's deployed reference oracle, and rehearses the entire
-pair deployment by impersonating the whitelisted deployer: real `deploy()`, real borrows at the
-LTV bound, the deviation gate closing, the pip-pause freeze, and a liquidation.
+expected `IDualOracle` interface id, and rehearses the entire pair deployment by impersonating the
+whitelisted deployer: real `deploy()`, real borrows at the LTV bound, the deviation gate closing,
+the pip-pause freeze, and a liquidation.

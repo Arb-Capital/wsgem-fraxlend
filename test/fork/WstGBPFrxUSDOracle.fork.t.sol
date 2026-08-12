@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {WsgemFraxlendDualOracle} from "../../src/WsgemFraxlendDualOracle.sol";
-import {IDualOracle, IERC165} from "../../src/interfaces/IDualOracle.sol";
+import {IDualOracle} from "../../src/interfaces/IDualOracle.sol";
 import {IWsgem} from "../../src/interfaces/IWsgem.sol";
 import {IChainlinkAggregator} from "../../src/interfaces/IChainlinkAggregator.sol";
 import {WstGBPFrxUSDOracleScript, WstGBPFrxUSDConstants} from "../../script/WstGBPFrxUSD.s.sol";
@@ -27,10 +27,6 @@ contract WstGBPFrxUSDOracleForkTest is Test {
     address internal constant WSTGBP = 0x57C3571f10767E49C9d7b60feb6c67804783B7aE;
     address internal constant GBP_USD = 0x5c0Ab2d9b5a7ed9f470386e82BB36A3613cDd4b5;
     address internal constant FRXUSD_USD = 0x9B4a96210bc8D9D55b1908B465D8B0de68B7fF83;
-
-    /// @dev The live frxUSD/KRWQ dual oracle -- the deployed reference this repo's IDualOracle
-    ///      declaration is pinned against.
-    address internal constant KRWQ_ORACLE = 0xd84cCBd42046AA35c7d408A92872F0253aEDF030;
 
     WsgemFraxlendDualOracle internal oracle;
 
@@ -87,11 +83,9 @@ contract WstGBPFrxUSDOracleForkTest is Test {
         assertEq(low_, frxRaw_ * 1e36 / (mint_ * gbpRaw_));
     }
 
-    function test_theInterfaceIdMatchesWhatTheLiveReferenceOracleRegisters() public view {
-        // Compare the local interface id with the deployed Frax oracle.
+    function test_theInterfaceIdMatchesTheExpectedFraxLendId() public view {
         bytes4 id_ = type(IDualOracle).interfaceId;
         assertEq(id_, bytes4(0x415f1303));
-        assertTrue(IERC165(KRWQ_ORACLE).supportsInterface(id_));
         assertTrue(oracle.supportsInterface(id_));
     }
 

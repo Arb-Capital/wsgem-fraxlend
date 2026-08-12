@@ -64,9 +64,9 @@ abstract contract WstGBPFrxUSDConstants is WsgemFraxlendConfig {
     }
 
     /// @dev Frax's own staleness convention for a 24 h feed: heartbeat + 300 s grace, exactly the
-    ///      86,700 the live reference dual oracle uses. Immutable on the oracle -- there is no
-    ///      owner to retune it. A feed lapse past the bound serves the last valid answer with an
-    ///      `isBadData` warning; a permanent feed change requires a redeploy plus governance swap.
+    ///      configured 86,700 seconds. Immutable on the oracle -- there is no owner to retune it.
+    ///      A feed lapse past the bound serves the last valid answer with an `isBadData` warning;
+    ///      a permanent feed change requires a redeploy plus governance swap.
     function GEM_USD_MAX_DELAY() public pure virtual override returns (uint256) {
         return 86_700;
     }
@@ -98,10 +98,7 @@ abstract contract WstGBPFrxUSDConstants is WsgemFraxlendConfig {
 
     // --- The pair's configData -----------------------------------------------------------------
     //
-    // Based on the live frxUSD/KRWQ reference pair (registry #71) -- the newest fiat-pegged
-    // 18-decimal collateral on the v5 deployer, and the closest structural relative of this
-    // market. This configuration uses a 5% deviation gate instead of the reference pair's 10%;
-    // the other risk parameters follow the reference pair. Frax has final approval.
+    // Proposed risk parameters for this market. Frax has final approval.
 
     /// @dev 5% at 1e5 precision. The oracle's own low/high spread is the wrapper's mint/burn
     ///      band, approximately 25 bp today. The gate closes borrowing above 5%.
@@ -115,14 +112,13 @@ abstract contract WstGBPFrxUSDConstants is WsgemFraxlendConfig {
         return 0x987a96c6637cF7E7B369BA7C1110d5fB69fb2d17;
     }
 
-    /// @dev The reference pair's seed: ~30% APR at full utilization, per-second 1e18 rate. Must
-    ///      sit inside the rate contract's [MIN, MAX] full-utilization band; V3's floor is ~25%.
+    /// @dev ~30% APR at full utilization, per-second 1e18 rate. Must sit inside the rate
+    ///      contract's [MIN, MAX] full-utilization band; V3's floor is ~25%.
     function FULL_UTILIZATION_RATE() public pure virtual override returns (uint64) {
         return 9_494_822_760;
     }
 
-    /// @dev 75% at 1e5 precision -- the reference pair's value and FraxLend's usual for
-    ///      fiat-pegged collateral.
+    /// @dev 75% at 1e5 precision for fiat-pegged collateral.
     function MAX_LTV() public pure virtual override returns (uint256) {
         return 75_000;
     }

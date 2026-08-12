@@ -12,12 +12,10 @@ interface IERC165 {
 /// @notice The oracle interface a FraxLend pair prices against, re-typed from the verified source
 ///         of the live oracles Frax deploys today.
 /// @dev The pair calls `getPrices()`; the remaining functions support Frax tooling, UI
-///      and risk monitoring. The member set below is exactly the one the live reference oracle
-///      registers under ERC-165: `type(IDualOracle).interfaceId == 0x415f1303`, which the fork
-///      suite pins against the deployed reference at
-///      `0xd84cCBd42046AA35c7d408A92872F0253aEDF030`. Frax's published interface also declares
-///      `CHAINLINK_FEED_ADDRESS()`, but the registered interface id excludes it, so it is not a
-///      member here.
+///      and risk monitoring. The member set below has the expected ERC-165 id
+///      `type(IDualOracle).interfaceId == 0x415f1303`, pinned by the test suite. Frax's published
+///      interface also declares `CHAINLINK_FEED_ADDRESS()`, but that getter is excluded from the
+///      registered interface id, so it is not a member here.
 ///
 ///      `getPrices()` returns the amount of collateral, at its native decimals, that 1e18 units of
 ///      the asset buys. For an 18-decimal collateral worth more than a dollar against a dollar

@@ -50,7 +50,7 @@ contract WstGBPFrxUSDDeployScriptTest is Test, WstGBPFrxUSDConstants {
     }
 
     function test_theReviewedPairParameterProposalIsPinned() public pure {
-        // The 5% deviation gate is an intentional tightening from the reference pair's live 10%.
+        // The 5% deviation gate leaves ample room above the wrapper's ordinary ~25 bp spread.
         assertEq(MAX_ORACLE_DEVIATION(), 5_000);
         assertEq(RATE_CONTRACT(), 0x987a96c6637cF7E7B369BA7C1110d5fB69fb2d17);
         assertEq(FULL_UTILIZATION_RATE(), 9_494_822_760);

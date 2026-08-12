@@ -91,15 +91,15 @@ return a nonzero quote while the pip is paused. Because the pip is the pause aut
   settable `maximumOracleDelay`; this one is a passthrough of an already-administered price and
   does not add a second administrative role. A Chainlink heartbeat change means a
   redeploy (stateless, so a replacement costs only gas) and a governance oracle swap on the pair.
-- **No frxUSD hard-peg assumption.** The reference KRWQ oracle treats frxUSD as $1.00; this one
-  reads the frxUSD/USD feed, so a depeg moves the price instead of silently mispricing collateral.
+- **No frxUSD hard-peg assumption.** This oracle reads the frxUSD/USD feed, so a depeg moves the
+  price instead of silently mispricing collateral.
   A same-currency market (asset in the gem's own currency) passes the same feed for both legs and
   the FX cancels exactly.
 - **No NAV-cadence assumption.** The pip publishes weekly today and may become per-block; nothing
   here reads or stores a cadence. Staleness bounds exist only on the Chainlink legs, which do
   carry publication times.
-- **No round history, no events.** FraxLend reads a spot pair; history lives in the sibling
-  aggregator repos that exist to provide it.
+- **No round history, no events.** FraxLend reads the current price; this oracle does not duplicate
+  upstream feed history.
 
 ## 6. The metadata surface
 
@@ -107,6 +107,5 @@ The pair calls only `getPrices()`. The rest of `IDualOracle` — `ORACLE_PRECISI
 `BASE_TOKEN_*`/`QUOTE_TOKEN_*` (USD sentinel `address(840)` against the collateral, per Frax
 convention), `NORMALIZATION_*` (zero for an 18-decimal collateral, so `getPricesNormalized()` is
 the identity), `decimals()` (18), `name()`, ERC-165 — exists for Frax's tooling and review. The
-interface id the live reference oracle registers is `0x415f1303`, which **excludes** the
-`CHAINLINK_FEED_ADDRESS()` getter its own interface file declares; the local declaration matches
-the registered reality, verified on-chain and pinned by both the unit and fork suites.
+expected interface id is `0x415f1303`, which **excludes** the `CHAINLINK_FEED_ADDRESS()` getter
+from the registered member set; the local declaration is pinned by both the unit and fork suites.
