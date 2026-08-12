@@ -6,6 +6,10 @@ out/
 .logs/
 .ignore/
 
+# Python bytecode. The redaction suite regenerates it on import (timestamp-embedding, so it
+# differs across clones and Python versions); tracked, it trips the clean-tree release gate.
+__pycache__/
+
 # Ignores development broadcast logs
 !/broadcast
 /broadcast/*/31337/

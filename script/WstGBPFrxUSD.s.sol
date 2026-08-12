@@ -38,8 +38,8 @@ abstract contract WstGBPFrxUSDConstants is WsgemFraxlendConfig {
     // --- The oracle's wiring -------------------------------------------------------------------
 
     /// @dev wstGBP, the wsgem: 18 decimals, non-rebasing, NAV accrues against tGBP. Transfers are
-    ///      compliance-gated (`canPass`), which a FraxLend pair tolerates -- the gate must simply
-    ///      allow the pair itself to hold the token before the market can custody collateral.
+    ///      screened (`canPass`) against a permissive banlist administered on tGBP -- default-allow,
+    ///      so a FraxLend pair needs no arranging; only a banlisted party cannot move collateral.
     function WSGEM() public pure virtual override returns (address) {
         return 0x57C3571f10767E49C9d7b60feb6c67804783B7aE;
     }

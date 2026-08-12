@@ -21,7 +21,7 @@ and update this table. Follow the evidence and recovery checklist in
 
 | Parameter | Value | Provenance |
 |---|---|---|
-| wsgem / collateral | `0x57C3571f10767E49C9d7b60feb6c67804783B7aE` | wstGBP, 18 dp; non-rebasing wrapper, NAV accrues against tGBP; transfers compliance-gated |
+| wsgem / collateral | `0x57C3571f10767E49C9d7b60feb6c67804783B7aE` | wstGBP, 18 dp; non-rebasing wrapper, NAV accrues against tGBP; transfers screened by a tGBP-administered banlist |
 | gem | `0x27f6c8289550fCE67f6B50BeD1F519966aFE5287` | tGBP, 18 dp; cross-checked against `wsgem.gem()` in preflight |
 | asset | `0xCAcd6fd266aF91b8AeD52aCCc382b4e165586E29` | frxUSD, 18 dp — **not** legacy FRAX `0x853d955a…` |
 | gem/USD feed | `0x5c0Ab2d9b5a7ed9f470386e82BB36A3613cDd4b5` | Chainlink GBP/USD: 8 dp, 24 h heartbeat, 0.15% deviation trigger |
@@ -96,9 +96,10 @@ FraxLend `deploy()` is whitelist-gated, so this is a request to review the oracl
 6. **Deployment funding**: the v5 deployer must hold Frax's configured frxUSD seed before calling
    `deploy(configData)`. Its balance was zero during the 2026-08-11 pre-deployment review, so Frax
    must fund it immediately before deployment and confirm the required seed amount.
-7. **Compliance prerequisite**: wstGBP transfers are compliance-gated; the gate must allow the
-   resulting pair address to hold the token before the market can custody collateral (the same
-   arrangement as the token's other lending deployments).
+7. **Compliance note**: wstGBP transfers consult a permissive banlist administered on tGBP
+   (default-allow; wstGBP does not control it), so no allowlisting step is needed for the pair.
+   The residual cases are remote but worth knowing: a banlisted address cannot receive seized
+   collateral, and a banlisted pair would freeze collateral movement.
 
 ## Related deployments of the same collateral
 

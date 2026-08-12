@@ -7,7 +7,7 @@ authoritative constants (pinned by the test suite); this sheet is for humans and
 
 | Contract | Address | Notes |
 |---|---|---|
-| wstGBP (wsgem, collateral) | `0x57C3571f10767E49C9d7b60feb6c67804783B7aE` | 18 dp; compliance-gated transfers; `burncost()`/`mintcost()` quotes in tGBP |
+| wstGBP (wsgem, collateral) | `0x57C3571f10767E49C9d7b60feb6c67804783B7aE` | 18 dp; transfers screened by a tGBP-administered banlist (default-allow); `burncost()`/`mintcost()` quotes in tGBP |
 | tGBP (gem) | `0x27f6c8289550fCE67f6B50BeD1F519966aFE5287` | 18 dp |
 | wstGBP pip (NAV feed) | `0x6A79dCe61A12aa4b75449e0B03746260765D07dF` | behind an upgradeable proxy; `read()` = WAD NAV, 0 = paused; cached by the oracle at construction |
 | frxUSD (asset) | `0xCAcd6fd266aF91b8AeD52aCCc382b4e165586E29` | 18 dp |

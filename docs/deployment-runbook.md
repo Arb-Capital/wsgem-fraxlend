@@ -86,15 +86,16 @@ second-person review before considering another broadcast.
 5. Confirm registry inclusion, asset, collateral, oracle, 5% maximum deviation, rate contract,
    utilization seed, LTV and both liquidation fees. Confirm `updateExchangeRate()` stores the
    oracle's current low/high values.
-6. Have the wstGBP compliance authority allow the pair to hold collateral. Before public launch,
-   perform minimal deposit, add-collateral, borrow and repay transactions and confirm an unapproved
-   address cannot bypass the token's compliance rules.
+6. Confirm the pair is not on the tGBP banlist (wstGBP transfers are default-allow against a
+   tGBP-administered banlist; there is no allowlisting step). Before public launch, perform
+   minimal deposit, add-collateral, borrow and repay transactions and confirm a banlisted
+   address cannot move the token.
 
 ## Monitoring and recovery
 
 Monitor both Chainlink round timestamps and answers, the pip value, `burncost()`/`mintcost()`,
-low/high deviation, oracle-call reverts, compliance status, upstream proxy implementations and pair
-configuration. A stale feed or paused pip intentionally freezes price-dependent pair actions.
+low/high deviation, oracle-call reverts, compliance status (the tGBP banlist — a banlisted pair or
+liquidator blocks collateral movement), upstream proxy implementations and pair configuration. A stale feed or paused pip intentionally freezes price-dependent pair actions.
 There is no oracle administrator: recovery from a permanent upstream/configuration change requires
 a replacement oracle and a Frax-governance oracle migration, followed by the same review and
 release process.

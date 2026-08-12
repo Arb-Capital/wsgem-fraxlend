@@ -12,7 +12,8 @@ import {WstGBPFrxUSDConstants} from "../../script/WstGBPFrxUSD.s.sol";
 import {WsgemFraxlendConfig} from "../../script/WsgemFraxlendDeploy.s.sol";
 
 /// @dev The wsgem's compliance layer, declared here because only this rehearsal touches it: the
-///      token consults `Cop(cop).pass(usr)` on every transfer party.
+///      token consults `Cop(cop).pass(usr)` on every transfer party -- a default-allow banlist
+///      administered on tGBP.
 interface IGatedToken {
     function cop() external view returns (address);
 }
@@ -58,8 +59,8 @@ contract MarketScriptHarness is WstGBPFrxUSDMarketScript {
 /// @notice The full whitelisted-deployer rehearsal: the real `FraxlendPairDeployer.deploy()` run
 ///         with this repo's configData, then the resulting pair borrowed from, gated, and frozen.
 /// @dev What Frax will execute is exercised end to end -- seeding included -- with only two
-///      concessions to the fork: the whitelisted EOA is impersonated, and the wsgem's compliance
-///      gate is mocked open so test actors can hold the collateral.
+///      concessions to the fork: the whitelisted EOA is impersonated, and the wsgem's banlist
+///      check is mocked to pass so no test actor can trip it.
 contract WstGBPFrxUSDPairForkTest is Test {
     address internal constant FRAX_DEPLOYER_EOA = 0xa4EC124e09D6D1A092c6BD16aFac9CD83f73E3c3;
 
@@ -110,9 +111,9 @@ contract WstGBPFrxUSDPairForkTest is Test {
         pair = IFraxlendPair(IFraxlendPairDeployer(deployer_).deploy(config_));
         pair.updateExchangeRate();
 
-        // Open the wsgem's compliance gate for every party in this rehearsal. The selector-only
-        // mock answers `pass(anyone) == true`, which is the production prerequisite the Frax team
-        // must arrange for the pair address anyway.
+        // Pin the banlist check open for every party in this rehearsal. The cop is a default-allow
+        // banlist read from tGBP, so production needs no arranging; the selector-wide mock just
+        // keeps the rehearsal on the nobody-banlisted path.
         vm.mockCall(IGatedToken(wstgbp).cop(), abi.encodeWithSelector(ICop.pass.selector), abi.encode(true));
 
         // Fund the actors and stock the lending side.

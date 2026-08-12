@@ -78,7 +78,9 @@ wrapper's ~25 bp mint/burn spread, and the one mechanism a flag could have alert
 structurally blind to the degradation. A flagged-but-served stale price would keep borrowing open
 against arbitrarily old FX data. Hence: stale reverts, like everything else.
 
-A reverting oracle freezes the pair — no borrows, *and no liquidations*. For an ownerless
+A reverting oracle freezes the pair — no borrows, *and no liquidations*; borrowers with debt
+cannot withdraw collateral either (`removeCollateral` refreshes the rate), while repayment and
+zero-debt withdrawal stay open. For an ownerless
 passthrough that is the correct terminal state: a paused pip means redemptions are halted, and
 nothing on this contract can know a better price meanwhile. This is the exact opposite of the
 LlamaLend oracle's never-revert design, because the two protocols invert the meaning of a revert:
