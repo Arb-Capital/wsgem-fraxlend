@@ -36,15 +36,15 @@ correct.
 The full derivation (and the folded `PRICE_SCALE` arithmetic) is argued in
 [docs/00-design.md](docs/00-design.md).
 
-## Failure policy: revert is the failure mode
+## Failure policy: warn on stale, revert on unusable
 
 A FraxLend pair treats the oracle's `isBadData` as a warning — it emits an event and uses the
-prices anyway. So unusable data (paused pip, zero quote, non-positive, malformed **or stale**
-Chainlink answer) **reverts**, which freezes the pair: no new borrows, no liquidations, until the
-data returns. Staleness gets no gentler treatment because both legs share the same fiat feeds: a
-frozen feed moves low and high together, the deviation gate the flag could have alerted never
-widens, and borrowing against old FX data would stay open. `isBadData` is therefore always
-false — this oracle refuses rather than warns. The pip is read first and is the sole pause
+prices anyway. A stale but otherwise valid Chainlink answer is therefore served as the last price
+with `isBadData = true`. This keeps withdrawals, repayments and liquidations available if a feed
+stops publishing. It also leaves new borrowing open at the stale FX price: the warning is advisory
+and the oracle cannot tell an exit from a risk-increasing call. Data from which no valid price can
+be formed (paused pip, zero quote, non-positive or malformed Chainlink answer, upstream revert,
+zero composed price or overflow) still reverts. The pip is read first and is the sole pause
 authority; the wsgem's NAV cadence is administered upstream (weekly today, possibly per-block
 later — nothing here assumes either).
 

@@ -198,6 +198,34 @@ contract WstGBPFrxUSDPairForkTest is Test {
         vm.stopPrank();
     }
 
+    function test_aWeekOldChainlinkPriceWarnsWithoutBlockingCollateralWithdrawal() public {
+        _addCollateral(1_000e18);
+        vm.prank(borrower);
+        pair.borrowAsset(100e18, 0, borrower);
+
+        // No new rounds can arrive on the pinned fork. A week later both answers are stale, but
+        // still positive and well formed, so the oracle serves exactly those prices with a
+        // warning instead of reverting.
+        vm.warp(block.timestamp + 7 days);
+        (bool bad_, uint256 low_, uint256 high_) = oracle.getPrices();
+        assertTrue(bad_);
+        assertGt(low_, 0);
+        assertLe(low_, high_);
+
+        // A debt-bearing borrower must refresh the exchange rate before collateral can leave.
+        // This is the user path the warning policy is designed to preserve.
+        vm.prank(borrower);
+        pair.removeCollateral(1e18, borrower);
+        assertEq(pair.userCollateralBalance(borrower), 999e18);
+
+        // Frax's warning is advisory: the same narrow low/high band still permits borrowing.
+        // This is the explicit continuity trade-off, pinned here so nobody mistakes the flag for
+        // a borrow pause.
+        vm.warp(block.timestamp + 1);
+        (bool borrowAllowed_,,) = pair.updateExchangeRate();
+        assertTrue(borrowAllowed_);
+    }
+
     function test_aPausedPipFreezesBorrowsAndLiquidationsAlike() public {
         _addCollateral(1_000e18);
         vm.prank(borrower);

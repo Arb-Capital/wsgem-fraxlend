@@ -95,7 +95,9 @@ second-person review before considering another broadcast.
 
 Monitor both Chainlink round timestamps and answers, the pip value, `burncost()`/`mintcost()`,
 low/high deviation, oracle-call reverts, compliance status (the tGBP banlist — a banlisted pair or
-liquidator blocks collateral movement), upstream proxy implementations and pair configuration. A stale feed or paused pip intentionally freezes price-dependent pair actions.
-There is no oracle administrator: recovery from a permanent upstream/configuration change requires
-a replacement oracle and a Frax-governance oracle migration, followed by the same review and
-release process.
+liquidator blocks collateral movement), upstream proxy implementations and pair configuration. A
+stale Chainlink feed serves its last valid answer with `isBadData = true`; alert on that warning
+immediately because FraxLend continues both exits and new borrowing at the last price. A paused pip
+or otherwise unusable input still freezes price-dependent pair actions. There is no oracle
+administrator: recovery from a permanent upstream/configuration change requires a replacement
+oracle and a Frax-governance oracle migration, followed by the same review and release process.

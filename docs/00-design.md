@@ -57,36 +57,28 @@ burncost` is an expectation, not an invariant: the oracle sorts its outputs and 
 (`1e5 * (high - low) / high`, 25 bp today against a 5% gate) is what turns an administratively
 widened spread into a borrowing halt rather than a mispricing.
 
-## 3. Revert is the failure mode
+## 3. Warn on stale, revert on unusable
 
 `isBadData` does not stop a FraxLend pair — `_updateExchangeRate` emits `WarnOracleData` and uses
 the returned prices regardless. An oracle that "fails safe" by returning a placeholder alongside
-`isBadData = true` has therefore failed dangerous: the placeholder prices positions. So this
-oracle **reverts** on everything unusable — paused pip (`OraclePaused`), zero quote
-(`InvalidQuote`), non-positive / zero-stamped / future-stamped Chainlink answer
-(`InvalidFeedAnswer`), a leg older than its staleness bound (`StaleFeed`, 86,700 s = heartbeat +
-300), a composition that floors to zero (`InvalidPrice`), and any upstream revert or
-checked-arithmetic overflow, both propagated deliberately. `isBadData` is kept for interface
-fidelity and is always false.
+`isBadData = true` has therefore failed dangerous: the placeholder prices positions. This oracle
+only warns when it still has a real price to serve: a positive, well-formed Chainlink answer older
+than its staleness bound (86,700 s = heartbeat + 300). It returns that last answer with
+`isBadData = true`; fresh answers return `false`.
 
-Staleness deserves its own paragraph, because Frax's own oracles *flag* it and serve the price —
-and survive doing so only because their two routes are independent (Chainlink against a Curve
-EMA). When one route freezes, the live one walks away from it, the low/high deviation widens, and
-the pair's deviation gate closes new borrowing by itself. Here both legs share the same two fiat
-feeds: a frozen GBP/USD moves `priceLow` and `priceHigh` together, the deviation never leaves the
-wrapper's ~25 bp mint/burn spread, and the one mechanism a flag could have alerted is
-structurally blind to the degradation. A flagged-but-served stale price would keep borrowing open
-against arbitrarily old FX data. Hence: stale reverts, like everything else.
+That policy follows Frax's own stale-route convention and prioritizes market continuity. If a feed
+stops publishing, withdrawals, repayments and liquidations remain available. The trade-off is
+unavoidable at the oracle layer: new borrowing also remains open at the stale FX price because
+FraxLend treats the flag as advisory and both returned prices share the same feeds, so their
+deviation does not widen. Monitoring must escalate the warning, and a permanently discontinued
+feed requires a replacement oracle plus a Frax-governance migration.
 
-A reverting oracle freezes the pair — no borrows, *and no liquidations*; borrowers with debt
-cannot withdraw collateral either (`removeCollateral` refreshes the rate), while repayment and
-zero-debt withdrawal stay open. For an ownerless
-passthrough that is the correct terminal state: a paused pip means redemptions are halted, and
-nothing on this contract can know a better price meanwhile. This is the exact opposite of the
-LlamaLend oracle's never-revert design, because the two protocols invert the meaning of a revert:
-Curve's AMM bricks on one, FraxLend merely waits. The cost is explicit: a Chainlink outage past
-24 h 5 m halts the market until the feed resumes — the same freeze a pip pause produces, and the
-intended one.
+The oracle still **reverts** when it cannot form a valid price: paused pip (`OraclePaused`), zero
+quote (`InvalidQuote`), non-positive / zero-stamped / future-stamped Chainlink answer
+(`InvalidFeedAnswer`), a composition that floors to zero (`InvalidPrice`), any upstream revert, or
+checked-arithmetic overflow. Those states cannot be repaired by attaching a warning to a
+placeholder. A pip pause deliberately remains a freeze because the upstream protocol has halted
+redemptions and publishes no usable NAV.
 
 ## 4. Pip first
 

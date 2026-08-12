@@ -294,7 +294,7 @@ contract WsgemFraxlendDualOracleTest is Test {
         );
     }
 
-    function test_constructionSelfChecksTheFullReadPath() public {
+    function test_constructionSelfChecksUnusableDataButAcceptsAStaleLastPrice() public {
         pip.poke(0);
         vm.expectRevert(WsgemFraxlendDualOracle.OraclePaused.selector);
         _deploy();
@@ -311,8 +311,11 @@ contract WsgemFraxlendDualOracleTest is Test {
         gemFeed.set(GBP0);
 
         vm.warp(block.timestamp + DELAY + 1);
-        vm.expectRevert(WsgemFraxlendDualOracle.StaleFeed.selector);
-        _deploy();
+        WsgemFraxlendDualOracle stale_ = _deploy();
+        (bool bad_, uint256 low_, uint256 high_) = stale_.getPrices();
+        assertTrue(bad_);
+        assertEq(low_, LOW0);
+        assertEq(high_, HIGH0);
         gemFeed.set(GBP0);
         assetFeed.set(FRX0);
 
@@ -387,11 +390,11 @@ contract WsgemFraxlendDualOracleTest is Test {
 
     // --- Prices: staleness ---------------------------------------------------------------------
     //
-    // Staleness REVERTS rather than flags: both legs share the same fiat feeds, so a frozen feed
-    // moves low and high together and the pair's deviation gate -- the only thing `isBadData`
-    // could have alerted -- never widens. See the contract's failure-policy note.
+    // Staleness serves the last valid price with a warning. FraxLend treats `isBadData` as
+    // advisory, so this keeps every price-touching path open -- including both user exits and new
+    // borrowing. The latter is the explicit cost of avoiding a permanent market freeze.
 
-    function test_isBadDataIsConstitutionallyFalse() public view {
+    function test_isBadDataIsFalseWhileBothFeedsAreFresh() public view {
         (bool bad_,,) = oracle.getPrices();
         assertFalse(bad_);
     }
@@ -405,24 +408,49 @@ contract WsgemFraxlendDualOracleTest is Test {
         assertEq(low_, LOW0);
 
         vm.warp(t0_ + DELAY + 1);
-        vm.expectRevert(WsgemFraxlendDualOracle.StaleFeed.selector);
-        oracle.getPrices();
+        (bad_, low_,) = oracle.getPrices();
+        assertTrue(bad_);
+        assertEq(low_, LOW0);
     }
 
-    function test_aStaleGemLegAloneFreezes() public {
+    function test_aStaleGemLegAloneWarnsAndServesTheLastPrice() public {
         vm.warp(block.timestamp + DELAY + 1);
         assetFeed.set(FRX0); // refresh only the asset leg
 
-        vm.expectRevert(WsgemFraxlendDualOracle.StaleFeed.selector);
-        oracle.getPrices();
+        (bool bad_, uint256 low_, uint256 high_) = oracle.getPrices();
+        assertTrue(bad_);
+        assertEq(low_, LOW0);
+        assertEq(high_, HIGH0);
     }
 
-    function test_aStaleAssetLegAloneFreezes() public {
+    function test_aStaleAssetLegAloneWarnsAndServesTheLastPrice() public {
         vm.warp(block.timestamp + DELAY + 1);
         gemFeed.set(GBP0); // refresh only the gem leg
 
-        vm.expectRevert(WsgemFraxlendDualOracle.StaleFeed.selector);
-        oracle.getPrices();
+        (bool bad_, uint256 low_, uint256 high_) = oracle.getPrices();
+        assertTrue(bad_);
+        assertEq(low_, LOW0);
+        assertEq(high_, HIGH0);
+    }
+
+    function test_aWeekOldPriceStillServesAndWarns() public {
+        vm.warp(block.timestamp + 7 days);
+
+        (bool bad_, uint256 low_, uint256 high_) = oracle.getPrices();
+        assertTrue(bad_);
+        assertEq(low_, LOW0);
+        assertEq(high_, HIGH0);
+    }
+
+    function test_theWarningClearsOnceBothFeedsRefresh() public {
+        vm.warp(block.timestamp + DELAY + 1);
+        (bool bad_,,) = oracle.getPrices();
+        assertTrue(bad_);
+
+        gemFeed.set(GBP0);
+        assetFeed.set(FRX0);
+        (bad_,,) = oracle.getPrices();
+        assertFalse(bad_);
     }
 
     // --- Prices: the revert taxonomy -----------------------------------------------------------

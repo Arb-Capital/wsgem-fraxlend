@@ -32,25 +32,14 @@ import {IDecimals} from "./interfaces/IDecimals.sol";
 ///         To retune a delay or rename, deploy again; the contract is stateless, so a replacement
 ///         costs nothing but the gas.
 ///
-///         FAILURE POLICY: REVERT IS THE FAILURE MODE. A FraxLend pair treats `isBadData` as a
-///         warning -- it emits `WarnOracleData` and uses the returned prices regardless -- so
-///         returning any placeholder alongside `true` would still price positions. Unusable data
-///         therefore REVERTS (paused pip, zero quote, non-positive, malformed or STALE Chainlink
-///         answer, overflow), which freezes the pair: no new borrows, no liquidations, until the
-///         data returns. For an ownerless passthrough that is the correct terminal state -- a
-///         pause upstream means redemptions are halted, and nothing on this contract can know a
-///         better price meanwhile.
-///
-///         WHY STALENESS IS NOT MERELY FLAGGED. Frax's own oracles flag a stale route and serve
-///         it, and survive doing so because their two routes are independent: when one goes
-///         stale, the live one walks away from it, the low/high deviation widens, and the pair's
-///         deviation gate closes new borrowing on its own. Here BOTH legs share the same two fiat
-///         feeds, so a frozen feed moves low and high together -- the deviation stays at the
-///         wrapper's mint/burn spread no matter how old the FX data grows, and the one gate that
-///         could catch the degradation is structurally blind to it. Borrowing against
-///         arbitrarily old FX data would remain open. So a leg past its staleness bound reverts
-///         like every other failure, and `isBadData` -- kept for interface fidelity -- is
-///         constitutionally false: any data bad enough to flag was bad enough to refuse.
+///         FAILURE POLICY. A stale Chainlink leg still has a usable last price, so the oracle
+///         returns that price with `isBadData = true`. FraxLend emits `WarnOracleData` and keeps
+///         using it. This preserves withdrawals, repayments and liquidations if a feed stops
+///         publishing, at the explicit cost that new borrowing also remains possible at the old
+///         FX price: FraxLend's warning is advisory and the oracle cannot distinguish an exit from
+///         a risk-increasing call. Data from which no price can safely be formed still REVERTS
+///         (paused pip, zero quote, non-positive or malformed Chainlink answer, upstream revert,
+///         zero composed price or arithmetic overflow).
 ///
 ///         WHY THE PIP IS READ FIRST. `burncost()` and `mintcost()` resolve through the wsgem's
 ///         gate contract, which sits behind an upgradeable proxy of its own. A broken or hostile
@@ -72,9 +61,9 @@ contract WsgemFraxlendDualOracle is IDualOracle {
     /// @dev ISO 4217 numeric code for USD, Frax's convention for "the dollar" as a base token.
     address internal constant _USD = address(840);
 
-    /// @dev Bounds on the two staleness windows. The floor rejects a delay that would freeze the
-    ///      pair on every heartbeat round of a daily fiat feed; the ceiling rejects a window so
-    ///      wide it can never trip. Both are sanity rails on a constructor argument, not policy.
+    /// @dev Bounds on the two staleness windows. The floor rejects a delay that would warn on
+    ///      every heartbeat round of a daily fiat feed; the ceiling rejects a window so wide it
+    ///      can never trip. Both are sanity rails on a constructor argument, not policy.
     uint256 internal constant _MIN_DELAY = 1 hours;
     uint256 internal constant _MAX_DELAY = 7 days;
 
@@ -165,7 +154,6 @@ contract WsgemFraxlendDualOracle is IDualOracle {
     error OraclePaused();
     error InvalidQuote();
     error InvalidFeedAnswer();
-    error StaleFeed();
     error InvalidPrice();
 
     // --- Construction ------------------------------------------------------------------------
@@ -258,9 +246,8 @@ contract WsgemFraxlendDualOracle is IDualOracle {
     // --- IDualOracle: prices -----------------------------------------------------------------
 
     /// @inheritdoc IDualOracle
-    /// @dev The only function the pair calls. Reverts on unusable data -- see the contract note on
-    ///      the failure policy. `isBadData` is always false: this oracle refuses rather than
-    ///      warns, because the pair's deviation gate cannot see a staleness both legs share.
+    /// @dev The only function the pair calls. A stale but otherwise valid Chainlink answer is
+    ///      served with `isBadData = true`; data from which no valid price can be formed reverts.
     function getPrices() public view returns (bool isBadData, uint256 priceLow, uint256 priceHigh) {
         return _compose(PIP, WSGEM, GEM_USD_FEED, GEM_USD_MAX_DELAY, ASSET_USD_FEED, ASSET_USD_MAX_DELAY, PRICE_SCALE);
     }
@@ -315,9 +302,9 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         uint256 mint_ = wsgem_.mintcost();
         if (burn_ == 0 || mint_ == 0) revert InvalidQuote();
 
-        uint256 gemRaw_ = _readFeed(gemFeed_, gemDelay_);
-        uint256 assetRaw_ = _readFeed(assetFeed_, assetDelay_);
-        isBadData_ = false;
+        (uint256 gemRaw_, bool gemIsStale_) = _readFeed(gemFeed_, gemDelay_);
+        (uint256 assetRaw_, bool assetIsStale_) = _readFeed(assetFeed_, assetDelay_);
+        isBadData_ = gemIsStale_ || assetIsStale_;
 
         // The inversion: the cheaper dollar valuation of the collateral (burncost) buys MORE
         // collateral per unit of asset, so it is the HIGH side. Floor division on both legs; at
@@ -331,12 +318,15 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         if (priceLow_ == 0) revert InvalidPrice();
     }
 
-    /// @dev One Chainlink leg. Garbage reverts, and so does staleness -- see the contract note on
-    ///      why a shared-feed dual oracle cannot afford to serve a stale answer under a mere
-    ///      flag. A future-stamped round is malformed, not extra-fresh: it would make the age
-    ///      subtraction underflow, and a feed that lies about time forfeits the benefit of a
-    ///      staleness bound.
-    function _readFeed(IChainlinkAggregator feed_, uint256 maxDelay_) internal view returns (uint256 raw_) {
+    /// @dev One Chainlink leg. A valid last answer is still usable after its freshness bound, but
+    ///      is marked stale so FraxLend emits its warning. A future-stamped round is malformed,
+    ///      not extra-fresh: it would make the age subtraction underflow, and a feed that lies
+    ///      about time cannot support an honest staleness signal.
+    function _readFeed(IChainlinkAggregator feed_, uint256 maxDelay_)
+        internal
+        view
+        returns (uint256 raw_, bool isStale_)
+    {
         (, int256 answer_,, uint256 updatedAt_,) = feed_.latestRoundData();
 
         if (answer_ <= 0) revert InvalidFeedAnswer();
@@ -346,7 +336,7 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         // forge-lint: disable-next-line(block-timestamp)
         if (updatedAt_ > block.timestamp) revert InvalidFeedAnswer();
         // forge-lint: disable-next-line(block-timestamp)
-        if (block.timestamp - updatedAt_ > maxDelay_) revert StaleFeed();
+        isStale_ = block.timestamp - updatedAt_ > maxDelay_;
 
         // Positive by the first check above.
         // forge-lint: disable-next-line(unsafe-typecast)

@@ -40,6 +40,16 @@ contract WstGBPFrxUSDOracleForkTest is Test {
         assertLe(low_, high_);
     }
 
+    function test_theProductionPreflightRefusesToLaunchOnAStaleFeed() public {
+        // Runtime continuity does not justify launching a new oracle while its warning is already
+        // active. With no new rounds on the pinned fork, the preflight names the first stale leg
+        // before any broadcast begins.
+        vm.warp(block.timestamp + 7 days);
+        WstGBPFrxUSDOracleScript script_ = new WstGBPFrxUSDOracleScript();
+        vm.expectRevert(bytes("preflight/gem-feed-stale"));
+        script_.run();
+    }
+
     function test_theLivePriceSitsInTheExpectedBandAndInsideTheDeviationGate() public view {
         (, uint256 low_, uint256 high_) = oracle.getPrices();
 

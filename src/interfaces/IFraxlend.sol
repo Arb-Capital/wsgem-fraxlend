@@ -70,6 +70,7 @@ interface IFraxlendPair {
     // --- Lending / borrowing / liquidation, for the fork rehearsal ---
     function deposit(uint256 amount, address receiver) external returns (uint256 sharesReceived);
     function addCollateral(uint256 collateralAmount, address borrower) external;
+    function removeCollateral(uint256 collateralAmount, address receiver) external;
     function borrowAsset(uint256 borrowAmount, uint256 collateralAmount, address receiver)
         external
         returns (uint256 sharesAdded);

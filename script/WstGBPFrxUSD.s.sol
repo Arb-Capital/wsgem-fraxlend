@@ -71,8 +71,8 @@ abstract contract WstGBPFrxUSDConstants is WsgemFraxlendConfig {
 
     /// @dev Frax's own staleness convention for a 24 h feed: heartbeat + 300 s grace, exactly the
     ///      86,700 the live reference dual oracle uses. Immutable on the oracle -- there is no
-    ///      owner to retune it -- and a feed lapse past the bound REVERTS (freezing the pair), so
-    ///      a Chainlink heartbeat change means a redeploy plus a governance oracle swap.
+    ///      owner to retune it. A feed lapse past the bound serves the last valid answer with an
+    ///      `isBadData` warning; a permanent feed change requires a redeploy plus governance swap.
     function GEM_USD_MAX_DELAY() public pure virtual override returns (uint256) {
         return 86_700;
     }

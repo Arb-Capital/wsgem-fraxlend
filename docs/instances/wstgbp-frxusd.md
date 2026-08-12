@@ -82,10 +82,10 @@ FraxLend `deploy()` is whitelist-gated, so this is a request to review the oracl
 2. **What it is**: an ownerless, stateless `IDualOracle` (id `0x415f1303`, ERC-165-registered).
    `priceHigh` = wstGBP's on-chain redemption quote × Chainlink GBP/USD ÷ Chainlink frxUSD/USD,
    inverted to collateral-per-asset; `priceLow` = the same through the issuance quote. No owner,
-   no setters; anything unusable — including a feed past its immutable 86,700 s staleness
-   bound — reverts, freezing the pair rather than pricing it (`isBadData` is always false: with
-   both legs on shared feeds, staleness never widens the deviation gate, so a flag would protect
-   nothing).
+   no setters. A positive, well-formed feed answer past its immutable 86,700 s freshness bound is
+   served as the last price with `isBadData = true`, preserving withdrawals, repayments and
+   liquidations if publication stops. The Frax warning is advisory, so new borrowing also remains
+   possible at that stale FX price. Data from which no valid price can be formed still reverts.
 3. **Sample output**: `getPrices()` at block 25,730,000 → `(false, 734035945961033381,
    735875635048655018)`; deviation 249/1e5.
 4. **The configData** (from `make configdata`), field-decoded as in the table above.

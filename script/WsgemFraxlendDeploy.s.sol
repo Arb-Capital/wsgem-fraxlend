@@ -85,7 +85,7 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
 
     /// @dev One Chainlink leg, probed with attribution: a preflight that let the raw revert
     ///      surface would name neither the feed nor the reason.
-    function _feedAnswer(address feed_, string memory what_) internal view returns (uint256) {
+    function _feedAnswer(address feed_, uint256 maxDelay_, string memory what_) internal view returns (uint256) {
         try IChainlinkAggregator(feed_).latestRoundData() returns (
             uint80, int256 answer_, uint256, uint256 updatedAt_, uint80
         ) {
@@ -93,6 +93,10 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
             // Heartbeat-scale comparison; a validator's few-second nudge decides nothing here.
             // forge-lint: disable-next-line(block-timestamp)
             require(updatedAt_ != 0 && updatedAt_ <= block.timestamp, string.concat(what_, "-timestamp"));
+            // Deploy only while the runtime warning is clear. Once deployed, the oracle itself
+            // serves this same last answer with `isBadData = true` instead of freezing the pair.
+            // forge-lint: disable-next-line(block-timestamp)
+            require(block.timestamp - updatedAt_ <= maxDelay_, string.concat(what_, "-stale"));
             // Positive by the require above.
             // forge-lint: disable-next-line(unsafe-typecast)
             return uint256(answer_);
@@ -107,8 +111,8 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
     function _expectedPrices() internal view returns (uint256 low_, uint256 high_) {
         uint256 burn_ = IWsgem(WSGEM()).burncost();
         uint256 mint_ = IWsgem(WSGEM()).mintcost();
-        uint256 gemRaw_ = _feedAnswer(GEM_USD_FEED(), "preflight/gem-feed");
-        uint256 assetRaw_ = _feedAnswer(ASSET_USD_FEED(), "preflight/asset-feed");
+        uint256 gemRaw_ = _feedAnswer(GEM_USD_FEED(), GEM_USD_MAX_DELAY(), "preflight/gem-feed");
+        uint256 assetRaw_ = _feedAnswer(ASSET_USD_FEED(), ASSET_USD_MAX_DELAY(), "preflight/asset-feed");
 
         uint256 scale_ = 10
             ** (36
@@ -181,9 +185,9 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
     }
 
     /// @dev Common to both targets: the chain, the wiring the constants claim, and that the live
-    ///      sources are actually alive. Refusing to deploy against a paused feed is the point --
-    ///      an oracle constructed over one would revert in its own self-check anyway, three frames
-    ///      deeper and with less to say.
+    ///      sources are actually alive and fresh. Runtime staleness is a warning, but starting a
+    ///      new market on a warning would be indefensible; `_expectedPrices()` rejects it here
+    ///      before any deployment broadcast.
     function _preflightCommon() internal view {
         require(block.chainid == CHAIN_ID(), "preflight/wrong-chain");
 
