@@ -5,27 +5,17 @@ pragma solidity ^0.8.28;
 /// @title IChainlinkAggregator
 /// @notice The subset of Chainlink's `AggregatorV3Interface` this oracle needs: the latest answer,
 ///         when it was written, and the scale it is written in.
-/// @dev The address consumers hold is an `EACAggregatorProxy`, not the aggregator itself -- the
-///      proxy is repointable by Chainlink at a phase change, which is how a feed is upgraded
-///      without consumers moving. An oracle therefore reads the proxy and must not cache anything
-///      the proxy can change underneath it except `decimals()`, which is fixed for the life of a
-///      feed.
+/// @dev Consumers read an `EACAggregatorProxy`, which Chainlink may repoint during a phase change.
+///      `decimals()` remains fixed for the life of the feed.
 ///
-///      Unlike a wsgem's `pip`, this feed DOES carry a publication time, so a staleness bound is
-///      possible here and is the only defence against a halted OCR round. `answeredInRound` and
-///      `startedAt` are deliberately omitted: the first is meaningless on modern OCR feeds, and the
-///      second reports when the round opened rather than when the answer landed.
+///      Unlike a wsgem pip, this feed includes a publication time. `answeredInRound` is not used
+///      for OCR feeds, and `startedAt` is the round start rather than the answer timestamp.
 ///
-///      The fiat feeds this oracle composes (e.g. GBP/USD on Ethereum mainnet) answer in 8
-///      decimals on a 24-hour heartbeat, with deviation rounds landing far more often. Note the
-///      deviation threshold is a TRIGGER and not a bound: it says when a round is submitted, not
-///      how far the answer may move between rounds, so a fast market delivers a single round
-///      several times larger. Nothing here caps a step. They publish through weekends, so a
-///      staleness bound needs no foreign-exchange market-hours carve-out.
+///      The configured fiat feeds use 8 decimals and a 24-hour heartbeat. Their deviation
+///      threshold triggers publication; it does not bound the size of a price move.
 interface IChainlinkAggregator {
-    /// @notice The latest round. Only `answer` and `updatedAt` are load-bearing here.
-    /// @dev `answer` is signed and CAN be negative or zero on a broken feed; callers must reject
-    ///      anything that is not strictly positive rather than casting blind.
+    /// @notice The latest round. This oracle uses `answer` and `updatedAt`.
+    /// @dev `answer` is signed and may be zero or negative.
     function latestRoundData()
         external
         view

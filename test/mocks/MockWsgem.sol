@@ -2,10 +2,7 @@
 pragma solidity ^0.8.28;
 
 /// @notice A wsgem price feed that can be driven into the states the oracle must handle.
-/// @dev The real feed sits behind an upgradeable proxy, so "unreadable" is as much a state as
-///      "paused". This oracle's policy is to PROPAGATE a revert (freeze), not absorb it, so a
-///      single REVERTING mode covers every exotic implementation swap -- they all end the same
-///      way here.
+/// @dev `REVERTING` exercises upstream call failure handling.
 contract MockPip {
     enum Mode {
         NORMAL,
@@ -34,7 +31,7 @@ contract MockPip {
     }
 }
 
-/// @notice Minimal token: the one view the oracle reads off a gem or an asset.
+/// @notice Minimal token exposing `decimals()`.
 contract MockToken {
     uint8 public decimals;
 
@@ -44,10 +41,8 @@ contract MockToken {
 }
 
 /// @notice The subset of a wsgem the oracle reads.
-/// @dev The quotes are stored values independent of the pip, which is exactly what makes the
-///      hostile-gate state expressible: poke the pip to zero and the quotes keep answering. The
-///      real wrapper's gate sits behind its own proxy and could do just that -- the pip-first
-///      discipline in the oracle is what this models.
+/// @dev Quotes are stored independently from the pip so tests can pause the pip while the gate
+///      continues to return nonzero values.
 contract MockWsgem {
     enum Mode {
         NORMAL,
@@ -89,7 +84,7 @@ contract MockWsgem {
     }
 
     // The real wrapper computes these through its gate; here they are stored values behind the
-    // mode switch, so a reverting gate is one call away and the pip stays independent.
+    // mode switch, allowing gate and pip failures to be tested independently.
     function navprice() external view answering returns (uint256) {
         return _navprice;
     }

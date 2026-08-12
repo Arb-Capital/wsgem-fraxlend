@@ -13,7 +13,7 @@ import {IDecimals} from "../src/interfaces/IDecimals.sol";
 import {IFraxlendPair, IFraxlendPairDeployer, IFraxlendWhitelist} from "../src/interfaces/IFraxlend.sol";
 
 /// @title  WsgemFraxlendConfig
-/// @notice Everything a wsgem FraxLend pair needs, and nothing that names one.
+/// @notice Configuration for a wsgem FraxLend pair.
 ///
 /// @dev Getters are `view virtual` rather than `pure` so a test harness can back them with mock
 ///      addresses. Production instances tighten to `pure` -- Solidity permits an override to
@@ -21,8 +21,7 @@ import {IFraxlendPair, IFraxlendPairDeployer, IFraxlendWhitelist} from "../src/i
 abstract contract WsgemFraxlendConfig {
     // --- Chain and FraxLend infrastructure -----------------------------------------------------
 
-    /// @dev Abstract rather than defaulted to 1. A default chain id is a preflight check that
-    ///      passes because nobody set it, which is the opposite of what the check is for.
+    /// @dev Required on every instance so the preflight cannot inherit a default chain id.
     function CHAIN_ID() public view virtual returns (uint256);
     function PAIR_DEPLOYER() public view virtual returns (address);
     function WHITELIST() public view virtual returns (address);
@@ -37,17 +36,12 @@ abstract contract WsgemFraxlendConfig {
     function ASSET_USD_FEED() public view virtual returns (address);
     function ASSET_USD_MAX_DELAY() public view virtual returns (uint256);
 
-    /// @dev Also abstract, and deliberately so: the price fold is built from this number, so
-    ///      inheriting it silently is how a quote at the wrong precision reaches a market. The
-    ///      preflight cross-checks it against the gem's real `decimals()`.
+    /// @dev Required because it determines the price scale. Preflight checks it against the gem.
     function QUOTE_DECIMALS() public view virtual returns (uint8);
     function ORACLE_NAME() public view virtual returns (string memory);
 
-    /// @dev The deployed oracle. `address(0)` until the oracle target has broadcast and the
-    ///      address has been written back into the instance file -- which is why the market target
-    ///      fails its preflight before then, deliberately: the two steps are separated by the Frax
-    ///      team's review of the oracle, and a committed constant survives that gap where an
-    ///      environment variable rots.
+    /// @dev The deployed oracle. It remains zero until the address is committed to the instance
+    ///      file after deployment and review.
     function ORACLE() public view virtual returns (address);
 
     // --- The pair's configData -----------------------------------------------------------------
@@ -65,11 +59,8 @@ abstract contract WsgemFraxlendConfig {
 
     // --- Sanity band ---------------------------------------------------------------------------
     //
-    // A decimal slip anywhere in the parameterisation moves the composed price by a factor of ten
-    // or more, and every other assertion in this script would still pass: the fold would match the
-    // constants, the constants would just be wrong. The band is the check that does not derive
-    // from the same constants it is checking. Collateral-per-asset direction: BELOW 1e18 for a
-    // collateral worth more than the asset.
+    // This independent price band catches decimal errors in the configured inputs. In
+    // collateral-per-asset terms, collateral worth more than the asset produces a value below 1e18.
 
     function MIN_PRICE() public view virtual returns (uint256);
     function MAX_PRICE() public view virtual returns (uint256);
@@ -83,14 +74,12 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
         require(target_.code.length != 0, what_);
     }
 
-    /// @dev One Chainlink leg, probed with attribution: a preflight that let the raw revert
-    ///      surface would name neither the feed nor the reason.
+    /// @dev Reads and validates one Chainlink feed with a feed-specific error prefix.
     function _feedAnswer(address feed_, uint256 maxDelay_, string memory what_) internal view returns (uint256) {
         try IChainlinkAggregator(feed_).latestRoundData() returns (
             uint80, int256 answer_, uint256, uint256 updatedAt_, uint80
         ) {
             require(answer_ > 0, string.concat(what_, "-nonpositive"));
-            // Heartbeat-scale comparison; a validator's few-second nudge decides nothing here.
             // forge-lint: disable-next-line(block-timestamp)
             require(updatedAt_ != 0 && updatedAt_ <= block.timestamp, string.concat(what_, "-timestamp"));
             // Deploy only while the runtime warning is clear. Once deployed, the oracle itself
@@ -105,9 +94,7 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
         }
     }
 
-    /// @dev The expected prices, recomputed from the raw sources and the tokens' own decimals --
-    ///      independently of the deployed oracle's immutables -- so the post-deploy comparison is
-    ///      a comparison and not a restatement.
+    /// @dev Recomputes prices from source contracts rather than oracle immutables.
     function _expectedPrices() internal view returns (uint256 low_, uint256 high_) {
         uint256 burn_ = IWsgem(WSGEM()).burncost();
         uint256 mint_ = IWsgem(WSGEM()).mintcost();
@@ -131,9 +118,7 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
         return 1e5 * (high_ - low_) / high_;
     }
 
-    /// @dev The FULL wiring, read back off the instance. Shared by BOTH targets, deliberately:
-    ///      `ORACLE()` is copied in by hand between two broadcasts, and this is the last moment a
-    ///      wrong paste can be caught -- the oracle is immutable on the pair once deployed.
+    /// @dev Checks all oracle parameters against the instance configuration before pair deployment.
     function _assertOracle(WsgemFraxlendDualOracle oracle_) internal view {
         require(address(oracle_.WSGEM()) == WSGEM(), "oracle/wsgem");
         require(address(oracle_.PIP()) == IWsgem(WSGEM()).pip(), "oracle/pip");
@@ -161,14 +146,11 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
         require(low_ >= MIN_PRICE(), "oracle/price-below-band");
         require(high_ <= MAX_PRICE(), "oracle/price-above-band");
 
-        // A spread past the pair's gate would not stop this deploy, but it would brick every
-        // new borrow on day one. Surface it here, where the number can still be discussed.
+        // Reject a configuration that would disable borrowing immediately.
         require(_deviation(low_, high_) <= MAX_ORACLE_DEVIATION(), "oracle/deviation-over-gate");
     }
 
-    /// @dev The nine-field encoding the v5 `FraxlendPairDeployer` decodes. Field order is
-    ///      load-bearing and the stale ten-field NatSpec in the deployer's own repo is not: the
-    ///      live contract abi.decodes exactly this, 288 bytes.
+    /// @dev Nine-field, 288-byte encoding used by the live v5 `FraxlendPairDeployer`.
     function _configData(address oracle_) internal view returns (bytes memory data_) {
         data_ = abi.encode(
             ASSET(), // 1. asset
@@ -184,10 +166,8 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
         require(data_.length == 288, "configdata/length");
     }
 
-    /// @dev Common to both targets: the chain, the wiring the constants claim, and that the live
-    ///      sources are actually alive and fresh. Runtime staleness is a warning, but starting a
-    ///      new market on a warning would be indefensible; `_expectedPrices()` rejects it here
-    ///      before any deployment broadcast.
+    /// @dev Shared chain, contract, decimal and price checks. Feeds must be fresh at deployment
+    ///      even though runtime staleness only raises a warning.
     function _preflightCommon() internal view {
         require(block.chainid == CHAIN_ID(), "preflight/wrong-chain");
 
@@ -219,8 +199,7 @@ abstract contract WsgemFraxlendBase is Script, WsgemFraxlendConfig {
 }
 
 /// @title  WsgemFraxlendOracleScript
-/// @notice Step 1 of 2. Deploys the dual oracle -- the only first-party bytecode in this repo,
-///         and the artifact the Frax team reviews for whitelisting.
+/// @notice Step 1 of 2. Deploys the dual oracle for Frax review.
 abstract contract WsgemFraxlendOracleScript is WsgemFraxlendBase {
     function run() external returns (WsgemFraxlendDualOracle oracle_) {
         _preflight();
@@ -245,9 +224,7 @@ abstract contract WsgemFraxlendOracleScript is WsgemFraxlendBase {
     function _preflight() internal view virtual {
         _preflightCommon();
 
-        // An already-recorded oracle means this target has run before; broadcasting again would
-        // strand the recorded one. A deliberate replacement blanks ORACLE() in the instance file
-        // first, which is a reviewable edit rather than a forgotten state.
+        // Prevent a second deployment while an oracle address is already recorded.
         require(ORACLE() == address(0), "preflight/oracle-already-recorded");
     }
 
@@ -276,9 +253,8 @@ abstract contract WsgemFraxlendOracleScript is WsgemFraxlendBase {
 ///         configData -- the artifact the Frax team feeds to `deploy()` -- and, when the sender
 ///         is on Frax's deployer whitelist, broadcasts the deploy itself.
 ///
-/// @dev The PRINT is the product here. FraxLend pair deployment is whitelist-gated and the normal
-///      operational path is Frax running our bytes, so a keyless simulation of this script
-///      (`make configdata`) is the expected terminal state, not a degraded one.
+/// @dev Pair deployment is whitelist-gated. An unprivileged simulation prints the config data for
+///      the Frax team without attempting a transaction.
 abstract contract WsgemFraxlendMarketScript is WsgemFraxlendBase {
     function run() external returns (address pair_) {
         _preflight();
@@ -287,9 +263,7 @@ abstract contract WsgemFraxlendMarketScript is WsgemFraxlendBase {
         _reportConfig(configData_);
 
         if (!IFraxlendWhitelist(WHITELIST()).fraxlendDeployerWhitelist(msg.sender)) {
-            // A simulation from an unwhitelisted sender is the hand-off path: the bytes above are
-            // the deliverable. A BROADCAST from one would half-run -- sign nothing, deploy
-            // nothing -- so it refuses loudly instead of exiting green.
+            // Simulations may print config data, but broadcasts require a whitelisted sender.
             require(!vm.isContext(VmSafe.ForgeContext.ScriptBroadcast), "deploy/sender-not-whitelisted");
             console2.log("sender is not on the FraxLend deployer whitelist; configData above is");
             console2.log("the hand-off artifact. No transaction was attempted.");
@@ -308,23 +282,18 @@ abstract contract WsgemFraxlendMarketScript is WsgemFraxlendBase {
     function _preflight() internal view virtual {
         _preflightCommon();
 
-        // Distinguished from "not a contract" on purpose: an unset ORACLE() means step 1 has not
-        // been run, or its address was never written back. That is the expected state of a fresh
-        // instance file and deserves its own message rather than a confusing code check.
+        // Report an unset address separately from an address with no code.
         require(ORACLE() != address(0), "preflight/oracle-unset");
         _requireCode(ORACLE(), "preflight/oracle-not-a-contract");
 
-        // The FULL wiring, not merely a code check: `ORACLE()` was typed in by hand after step 1,
-        // and the pair's oracle slot cannot be corrected after deploy, only governance-migrated.
+        // The oracle address is written into the instance file by hand, so verify all parameters.
         _assertOracle(WsgemFraxlendDualOracle(ORACLE()));
 
         _requireCode(PAIR_DEPLOYER(), "preflight/deployer-not-a-contract");
         _requireCode(WHITELIST(), "preflight/whitelist-not-a-contract");
         _requireCode(RATE_CONTRACT(), "preflight/rate-contract-not-a-contract");
 
-        // Version-pinned against a pasted predecessor: the v1 deployer at another address decodes
-        // a DIFFERENT configData layout, and these bytes fed to it would misparameterise a pair
-        // rather than revert.
+        // The v1 deployer uses a different configData layout.
         (uint256 major_,,) = IFraxlendPairDeployer(PAIR_DEPLOYER()).version();
         require(major_ == 5, "preflight/deployer-version");
 
@@ -347,8 +316,7 @@ abstract contract WsgemFraxlendMarketScript is WsgemFraxlendBase {
         require(oracle_ == ORACLE(), "pair/oracle");
         require(maxDev_ == MAX_ORACLE_DEVIATION(), "pair/max-oracle-deviation");
 
-        // The round-trip: the rates the pair stored on `updateExchangeRate()` are the rates the
-        // oracle serves this block.
+        // Confirm the pair stored the current oracle values.
         (, uint256 oLow_, uint256 oHigh_) = WsgemFraxlendDualOracle(ORACLE()).getPrices();
         require(low_ == oLow_ && high_ == oHigh_, "pair/exchange-rate-mismatch");
     }

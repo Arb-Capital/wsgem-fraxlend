@@ -4,16 +4,11 @@ pragma solidity ^0.8.28;
 
 /// @title IPip
 /// @notice The wsgem's oracle price feed.
-/// @dev `read()` is a single stored value published by a permissioned poker. There is no
-///      `updatedAt` view -- the publication time exists only in the feed's own event -- so no
-///      consumer can bound the age of a price on-chain. Any staleness policy has to be built from
-///      what a consumer itself observes, not from the feed.
+/// @dev `read()` returns a stored value published by an authorized account. There is no
+///      `updatedAt` view, so consumers cannot check its age on-chain.
 ///
-///      A paused feed reads zero. That is the one value this oracle must never propagate: a
-///      FraxLend pair treats its oracle's `isBadData` as a warning, not a stop, so the only way
-///      to refuse a paused feed is to revert -- which freezes the pair (no borrows, no
-///      liquidations) until the feed returns. See the design argument in
-///      `WsgemFraxlendDualOracle`.
+///      A paused feed reads zero. This oracle reverts on zero because FraxLend treats
+///      `isBadData` as advisory and would otherwise use the returned price.
 interface IPip {
     /// @notice The raw NAV in gem-per-wsgem at the gem's decimals. Zero when paused.
     function read() external view returns (uint256);

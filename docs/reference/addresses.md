@@ -11,7 +11,7 @@ authoritative constants (pinned by the test suite); this sheet is for humans and
 | tGBP (gem) | `0x27f6c8289550fCE67f6B50BeD1F519966aFE5287` | 18 dp |
 | wstGBP pip (NAV feed) | `0x6A79dCe61A12aa4b75449e0B03746260765D07dF` | behind an upgradeable proxy; `read()` = WAD NAV, 0 = paused; cached by the oracle at construction |
 | frxUSD (asset) | `0xCAcd6fd266aF91b8AeD52aCCc382b4e165586E29` | 18 dp |
-| legacy FRAX — **do not use** | `0x853d955aCEf822Db058eb8505911ED77F175b99e` | still live, one paste away; negative-pinned in the test suite |
+| legacy FRAX — **do not use** | `0x853d955aCEf822Db058eb8505911ED77F175b99e` | still live; explicitly excluded by the test suite |
 
 ## Chainlink feeds
 
@@ -36,5 +36,5 @@ authoritative constants (pinned by the test suite); this sheet is for humans and
 | Contract | Address | Why it matters here |
 |---|---|---|
 | KrwqDualOracle | `0xd84cCBd42046AA35c7d408A92872F0253aEDF030` | the live structural analogue; source of the registered `IDualOracle` id `0x415f1303`, pinned by the fork suite |
-| frxUSD/KRWQ pair (#71) | `0x00C242cA3Ef5c2CB909ed3eD972B6f24624B4337` | configData baseline; this proposal deliberately tightens its live 10% oracle-deviation gate to 5% |
+| frxUSD/KRWQ pair (#71) | `0x00C242cA3Ef5c2CB909ed3eD972B6f24624B4337` | configData baseline; this proposal uses a 5% oracle-deviation gate instead of its live 10% |
 | wstGBP burncost aggregator (8 dp) | `0xF7493C2739c2b1bF5E6bB0e5b16A265Ed0B400B0` | sibling repo's Chainlink shim; publishes burncost only, which is why this oracle reads the token directly |

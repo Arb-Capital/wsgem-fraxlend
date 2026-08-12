@@ -4,16 +4,14 @@ pragma solidity ^0.8.28;
 
 /// @dev Script- and test-facing declarations for the deployed FraxLend system, re-typed from the
 ///      verified sources of the live v5 `FraxlendPairDeployer` and a live v3.2.0 `FraxlendPair`.
-///      Nothing in `src/` proper depends on these; the oracle's only coupling to FraxLend is the
-///      `IDualOracle` shape it implements.
+///      The oracle contract depends only on `IDualOracle`.
 
 /// @title IFraxlendPairDeployer
 /// @notice The whitelist-gated factory that instantiates pairs.
 /// @dev `deploy()` reverts `WhitelistedDeployersOnly()` unless `msg.sender` passes the whitelist,
 ///      and reverts unless the deployer contract itself holds the seed amount of the ASSET token:
 ///      after CREATE2-ing the pair it deposits that seed into it. There is no public getter for
-///      the seed amount -- only `setAmountToSeed()` -- so a rehearsal funds the deployer
-///      generously rather than reading a number.
+///      the seed amount, so fork tests fund the deployer with more than the expected seed.
 interface IFraxlendPairDeployer {
     /// @param configData abi.encode(address asset, address collateral, address oracle,
     ///        uint32 maxOracleDeviation, address rateContract, uint64 fullUtilizationRate,

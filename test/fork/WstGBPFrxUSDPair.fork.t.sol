@@ -56,11 +56,9 @@ contract MarketScriptHarness is WstGBPFrxUSDMarketScript {
     }
 }
 
-/// @notice The full whitelisted-deployer rehearsal: the real `FraxlendPairDeployer.deploy()` run
-///         with this repo's configData, then the resulting pair borrowed from, gated, and frozen.
-/// @dev What Frax will execute is exercised end to end -- seeding included -- with only two
-///      concessions to the fork: the whitelisted EOA is impersonated, and the wsgem's banlist
-///      check is mocked to pass so no test actor can trip it.
+/// @notice Fork tests for deployment through the live FraxlendPairDeployer and pair operations.
+/// @dev The whitelisted deployer is impersonated and the wsgem banlist check is mocked to allow
+///      the test accounts.
 contract WstGBPFrxUSDPairForkTest is Test {
     address internal constant FRAX_DEPLOYER_EOA = 0xa4EC124e09D6D1A092c6BD16aFac9CD83f73E3c3;
 
@@ -95,14 +93,12 @@ contract WstGBPFrxUSDPairForkTest is Test {
         );
         harness.setOracle(address(oracle));
 
-        // The market script's own preflight must accept this configuration before anything is
-        // deployed with it -- the same gate `make market-deploy` runs.
+        // Run the same preflight used by `make market-deploy`.
         harness.preflightX();
 
         // Step 2, as Frax runs it: their whitelisted EOA calls deploy() on a deployer contract
         // that must already hold the seed liquidity in the asset token.
-        // Every harness read is materialised BEFORE the prank: a nested call, even a view one,
-        // would consume it and the deploy would run unpranked into the whitelist gate.
+        // Resolve harness values before `vm.prank`, which applies only to the next external call.
         address deployer_ = harness.PAIR_DEPLOYER();
         bytes memory config_ = harness.configDataX();
         deal(frxusd, deployer_, 1_000_000e18);
@@ -113,7 +109,7 @@ contract WstGBPFrxUSDPairForkTest is Test {
 
         // Pin the banlist check open for every party in this rehearsal. The cop is a default-allow
         // banlist read from tGBP, so production needs no arranging; the selector-wide mock just
-        // keeps the rehearsal on the nobody-banlisted path.
+        // keeps all test accounts on the unblocked path.
         vm.mockCall(IGatedToken(wstgbp).cop(), abi.encodeWithSelector(ICop.pass.selector), abi.encode(true));
 
         // Fund the actors and stock the lending side.
@@ -164,7 +160,7 @@ contract WstGBPFrxUSDPairForkTest is Test {
         pair.borrowAsset(max_ * 999 / 1000, 0, borrower);
 
         // The remaining headroom is ~0.1% of the bound; asking for 2% more must trip solvency,
-        // which the pair enforces against the HIGH exchange rate -- the burncost leg. Partial
+        // which the pair enforces against priceHigh, the burncost leg. Partial
         // match: Insolvent carries the live borrow/collateral/rate, which this test cannot pin.
         vm.prank(borrower);
         vm.expectPartialRevert(IFraxlendPairErrors.Insolvent.selector);
@@ -191,7 +187,7 @@ contract WstGBPFrxUSDPairForkTest is Test {
         vm.expectRevert(IFraxlendPairErrors.ExceedsMaxOracleDeviation.selector);
         pair.borrowAsset(100e18, 0, borrower);
 
-        // The gate stops NEW risk only: winding the position down stays open.
+        // The deviation gate blocks new borrowing but not repayment.
         vm.startPrank(borrower);
         IERC20Minimal(frxusd).approve(address(pair), type(uint256).max);
         pair.repayAsset(pair.userBorrowShares(borrower) / 2, borrower);
@@ -219,8 +215,7 @@ contract WstGBPFrxUSDPairForkTest is Test {
         assertEq(pair.userCollateralBalance(borrower), 999e18);
 
         // Frax's warning is advisory: the same narrow low/high band still permits borrowing.
-        // This is the explicit continuity trade-off, pinned here so nobody mistakes the flag for
-        // a borrow pause.
+        // The warning is advisory and does not pause borrowing.
         vm.warp(block.timestamp + 1);
         (bool borrowAllowed_,,) = pair.updateExchangeRate();
         assertTrue(borrowAllowed_);
@@ -232,9 +227,8 @@ contract WstGBPFrxUSDPairForkTest is Test {
         pair.borrowAsset(100e18, 0, borrower);
 
         // The upstream pause: the pip publishes zero, the oracle reverts, and every price-touching
-        // path on the pair reverts with it -- including liquidation. That is the designed terminal
-        // state for an ownerless passthrough, not an accident. The warp steps past the pair's
-        // same-timestamp rate reuse so it actually consults the oracle.
+        // path on the pair reverts with it, including liquidation. The warp steps past the pair's
+        // same-timestamp rate reuse so it consults the oracle again.
         vm.mockCall(address(oracle.PIP()), abi.encodeWithSelector(bytes4(keccak256("read()"))), abi.encode(0));
         vm.warp(block.timestamp + 1);
 
@@ -256,9 +250,8 @@ contract WstGBPFrxUSDPairForkTest is Test {
         vm.prank(borrower);
         pair.borrowAsset(borrowed_, 0, borrower);
 
-        // A 40% collateral markdown through both quotes: exchange rates rise ~1.67x, the LTV
-        // clears 120% at the LOW rate -- the mintcost leg, which is what liquidation prices
-        // against -- and the position becomes seizable.
+        // A 40% collateral markdown raises exchange rates by about 1.67x and makes the position
+        // liquidatable at priceLow, the mintcost leg.
         uint256 burn_ = IWsgem(wstgbp).burncost();
         uint256 mint_ = IWsgem(wstgbp).mintcost();
         vm.mockCall(wstgbp, abi.encodeWithSelector(IWsgem.burncost.selector), abi.encode(burn_ * 60 / 100));

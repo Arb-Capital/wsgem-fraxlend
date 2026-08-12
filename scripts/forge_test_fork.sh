@@ -2,7 +2,7 @@
 #
 # Fork tests against live mainnet state.
 #
-# Hard-fails without a mainnet RPC. This is deliberate: a "skip if no RPC" branch turns a missing
+# Hard-fails without a mainnet RPC: a "skip if no RPC" branch turns a missing
 # RPC into a green CI run, which is exactly how a broken deploy script reaches production.
 set -e
 

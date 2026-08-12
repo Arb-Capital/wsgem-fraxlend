@@ -2,10 +2,8 @@
 pragma solidity ^0.8.28;
 
 /// @notice A Chainlink push feed that can be driven into the states the oracle must handle.
-/// @dev `answer` is `int256` on the real interface and CAN be zero or negative on a broken feed,
-///      so it is signed here too -- a mock that could only hold positive answers would make the
-///      oracle's sign check untestable. As with `MockPip`, one REVERTING mode stands in for every
-///      broken-implementation shape, because this oracle's policy is to propagate the revert.
+/// @dev The signed answer permits tests for zero and negative feed values. `REVERTING` exercises
+///      upstream call failure handling.
 contract MockChainlinkFeed {
     enum Mode {
         NORMAL,
@@ -29,8 +27,7 @@ contract MockChainlinkFeed {
         updatedAt = block.timestamp;
     }
 
-    /// @notice Publish a round stamped at an arbitrary time -- how staleness (and a future stamp)
-    ///         is driven.
+    /// @notice Publish a round with an arbitrary timestamp.
     function setAt(int256 answer_, uint256 updatedAt_) external {
         answer = answer_;
         updatedAt = updatedAt_;

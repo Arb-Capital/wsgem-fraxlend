@@ -10,12 +10,8 @@ import {MockPip, MockToken, MockWsgem} from "./mocks/MockWsgem.sol";
 import {MockChainlinkFeed} from "./mocks/MockChainlinkFeed.sol";
 
 /// @notice The dual oracle over mocked feeds.
-/// @dev The worked fixture runs at the exact magnitudes the live wstGBP/frxUSD deployment will
-///      see, hand-derived once and pinned as integers -- if the fold in `PRICE_SCALE` or the
-///      division order ever changes, these tests break with the wrong number, not merely a wrong
-///      bit. Direction (burncost -> HIGH) is proven separately from magnitude, because the two
-///      failure shapes -- inverted mapping and mis-scaled fold -- have very different blast radii
-///      and deserve to fail loudly on their own.
+/// @dev The fixture uses values at the scale expected for wstGBP/frxUSD and pins the computed
+///      integer results. Separate tests cover price direction and decimal scaling.
 contract WsgemFraxlendDualOracleTest is Test {
     // The live wstGBP/frxUSD magnitudes, as read from mainnet, and the hand-derived expectations.
     uint256 internal constant NAV0 = 1007380025597183628; // 18-dp gem per wsgem
@@ -354,8 +350,7 @@ contract WsgemFraxlendDualOracleTest is Test {
     }
 
     function test_aSameCurrencyMarketCancelsTheFxLegExactly() public {
-        // One feed on both legs: the currency conversion must vanish from the composed price,
-        // leaving the pure collateral-per-asset inversion of the wsgem quote.
+        // Using one feed for both legs cancels the currency conversion.
         WsgemFraxlendDualOracle same_ = new WsgemFraxlendDualOracle(
             IWsgem(address(wsgem)),
             address(asset),
@@ -456,8 +451,8 @@ contract WsgemFraxlendDualOracleTest is Test {
     // --- Prices: the revert taxonomy -----------------------------------------------------------
 
     function test_aPausedPipFreezesEvenWhenTheGateStillQuotes() public {
-        // The hostile-gate state: the pip says paused, the quotes keep answering. Only the pip is
-        // the pause authority, and it is read first.
+        // The pip is paused while the gate continues to return quotes. The pip is the pause
+        // authority and must be checked first.
         pip.poke(0);
 
         vm.expectRevert(WsgemFraxlendDualOracle.OraclePaused.selector);
@@ -500,8 +495,7 @@ contract WsgemFraxlendDualOracleTest is Test {
     }
 
     function test_aCollapsedCompositionFreezesRatherThanServingZero() public {
-        // A quote and an FX leg large enough that the floor lands on zero: the oracle refuses,
-        // because a zero exchange rate reads as infinitely valuable collateral to the LTV math.
+        // A zero exchange rate would make collateral appear infinitely valuable to the LTV math.
         wsgem.setQuotes(NAV0, 1e30, 1e30);
         gemFeed.set(1e16);
 
@@ -544,8 +538,7 @@ contract WsgemFraxlendDualOracleTest is Test {
 
     // --- Fuzz ----------------------------------------------------------------------------------
 
-    /// @dev The fold, proven decimal-by-decimal: PRICE_SCALE must equal the hand formula for every
-    ///      decimals combination the constructor admits.
+    /// @dev Checks PRICE_SCALE against the formula for every admitted decimal combination.
     function testFuzz_theFoldedScaleMatchesTheDecimalsFormula(
         uint8 quoteDec_,
         uint8 gemFeedDec_,
@@ -557,9 +550,7 @@ contract WsgemFraxlendDualOracleTest is Test {
         assetDec_ = uint8(bound(assetDec_, 0, 18));
         assetFeedDec_ = uint8(bound(assetFeedDec_, 0, 18));
 
-        // Unit-scale values at each leg's claimed decimals, so the constructor's live self-check
-        // sees a coherent configuration (a mismatched magnitude is exactly what it exists to
-        // refuse, and is not what this test is about).
+        // Unit-scale values give the constructor a coherent configuration.
         MockWsgem fWsgem_ = new MockWsgem(address(gem), address(pip), 18);
         fWsgem_.setQuotes(NAV0, 10 ** uint256(quoteDec_), 10 ** uint256(quoteDec_));
         MockToken fAsset_ = new MockToken(assetDec_);
@@ -608,8 +599,7 @@ contract WsgemFraxlendDualOracleTest is Test {
         assertGt((low_ + 1) * lDen_, num_);
     }
 
-    /// @dev The same economics expressed at a 6-decimal quote scale must price identically to the
-    ///      18-decimal expression -- the fold is a rescaling, never a repricing.
+    /// @dev A 6-decimal quote scale must produce the same price as the 18-decimal expression.
     function testFuzz_quoteDecimalRescalingIsExact(uint256 quoteWad_) public {
         quoteWad_ = bound(quoteWad_, 0.01e18, 1e24);
         // Truncate to what a 6-decimal gem can express, so both oracles see the same number.

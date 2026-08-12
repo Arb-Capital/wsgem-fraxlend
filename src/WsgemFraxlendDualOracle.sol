@@ -16,41 +16,30 @@ import {IDecimals} from "./interfaces/IDecimals.sol";
 ///         values it for liquidation, and two Chainlink fiat legs carry both into the asset's
 ///         terms.
 ///
-///         DIRECTION. FraxLend prices are COLLATERAL-PER-ASSET: `getPrices()` returns how much
-///         collateral (at its native decimals) 1e18 of the asset buys. That inverts the intuitive
-///         quote, and with it the low/high mapping: `burncost` -- the LOWER dollar value of the
-///         collateral -- becomes the LARGER collateral-per-asset number and therefore `priceHigh`,
-///         which the pair uses for borrow solvency. `mintcost` becomes `priceLow`, which triggers
-///         and sizes liquidations. The economics read exactly as intended: you may only borrow
-///         against what redemption actually pays, and you are only liquidated against the price at
-///         which replacement collateral can actually be minted.
+///         FraxLend prices are collateral-per-asset: `getPrices()` returns the amount of collateral
+///         that 1e18 units of the asset buys. This reverses the usual quote direction. `burncost()`,
+///         the lower collateral valuation, becomes `priceHigh` and is used for borrow solvency.
+///         `mintcost()` becomes `priceLow` and is used for liquidations.
 ///
 /// @dev    There is no owner, no timelock, no setter and no upgrade path; every parameter is
-///         `immutable` and the contract holds no storage at all. This is deliberate: the wsgem's
-///         NAV is already a single administered slot, and the point of this oracle is to stand
-///         between that and a lending market -- not to add a second discretionary party on top.
-///         To retune a delay or rename, deploy again; the contract is stateless, so a replacement
-///         costs nothing but the gas.
+///         immutable and the contract has no storage. The wsgem NAV is already administered
+///         upstream, so this oracle does not add another administrative role. Changing a delay or
+///         name requires a new deployment.
 ///
-///         FAILURE POLICY. A stale Chainlink leg still has a usable last price, so the oracle
+///         A stale Chainlink leg still has a usable last price, so the oracle
 ///         returns that price with `isBadData = true`. FraxLend emits `WarnOracleData` and keeps
 ///         using it. This preserves withdrawals, repayments and liquidations if a feed stops
-///         publishing, at the explicit cost that new borrowing also remains possible at the old
-///         FX price: FraxLend's warning is advisory and the oracle cannot distinguish an exit from
-///         a risk-increasing call. Data from which no price can safely be formed still REVERTS
+///         publishing, but also permits new borrowing at the old FX price because the warning is
+///         advisory. Inputs from which no valid price can be formed revert
 ///         (paused pip, zero quote, non-positive or malformed Chainlink answer, upstream revert,
 ///         zero composed price or arithmetic overflow).
 ///
-///         WHY THE PIP IS READ FIRST. `burncost()` and `mintcost()` resolve through the wsgem's
-///         gate contract, which sits behind an upgradeable proxy of its own. A broken or hostile
-///         gate implementation could quote a nonzero price over a paused feed. Only the pip is the
-///         pause authority, so it is read FIRST and no quote is accepted without it. Do not fold
-///         these reads into one call.
+///         The pip is read before `burncost()` and `mintcost()`. Those quotes resolve through an
+///         upgradeable gate and may remain nonzero while the pip is paused. A zero pip value is
+///         therefore checked before either quote is accepted.
 ///
-///         REUSE. Everything token-specific is a constructor argument, so one bytecode serves
-///         every wsgem/asset market: new market, new instance, never a source edit. A
-///         same-currency market (asset denominated in the gem's own currency) passes the SAME
-///         Chainlink feed for both legs, and the FX cancels out of the composed price exactly.
+///         Token-specific values are constructor arguments. For a same-currency market, passing
+///         the same Chainlink feed for both legs cancels the FX conversion.
 contract WsgemFraxlendDualOracle is IDualOracle {
     // --- Constants ---------------------------------------------------------------------------
 
@@ -61,15 +50,11 @@ contract WsgemFraxlendDualOracle is IDualOracle {
     /// @dev ISO 4217 numeric code for USD, Frax's convention for "the dollar" as a base token.
     address internal constant _USD = address(840);
 
-    /// @dev Bounds on the two staleness windows. The floor rejects a delay that would warn on
-    ///      every heartbeat round of a daily fiat feed; the ceiling rejects a window so wide it
-    ///      can never trip. Both are sanity rails on a constructor argument, not policy.
+    /// @dev Constructor bounds for feed staleness windows.
     uint256 internal constant _MIN_DELAY = 1 hours;
     uint256 internal constant _MAX_DELAY = 7 days;
 
-    /// @dev Decimals cap shared by every token and feed here. All four exponent terms below stay
-    ///      in [0, 18], which keeps the folded scale's exponent in [0, 72] -- provably
-    ///      non-negative, so the scale is a single multiplier and needs no direction branch.
+    /// @dev Keeps every exponent term in [0, 18] and the folded exponent in [0, 72].
     uint8 internal constant _MAX_DECIMALS = 18;
 
     // --- Immutables: the price machine -------------------------------------------------------
@@ -99,9 +84,8 @@ contract WsgemFraxlendDualOracle is IDualOracle {
     uint256 public immutable ASSET_USD_MAX_DELAY;
 
     /// @notice Decimals of `WSGEM.burncost()`/`mintcost()` -- i.e. the GEM's decimals.
-    /// @dev Taken as a constructor argument rather than read from the pip, whose decimals view is
-    ///      a decorative ward-writable slot that nothing validates against the published scale.
-    ///      The deploy script is where this is checked against the gem's real `decimals()`.
+    /// @dev Supplied by the constructor because the pip's writable decimals value is not tied to
+    ///      its published scale. The deployment preflight checks this against `GEM.decimals()`.
     uint8 public immutable QUOTE_DECIMALS;
 
     /// @notice The folded power of ten: `price = assetRaw * PRICE_SCALE / (quoteRaw * gemRaw)`.
@@ -189,9 +173,7 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         address pip_ = wsgem_.pip();
         if (gem_ == address(0) || pip_ == address(0)) revert ZeroAddress();
 
-        // The collateral leg of the FraxLend price is served at the collateral's own decimals,
-        // and the fold below pins that term to 18; a wsgem is 18-decimal by construction, but a
-        // wrong address here must not become a silently mis-scaled market.
+        // The scaling formula assumes an 18-decimal collateral.
         if (wsgem_.decimals() != 18) revert UnsupportedDecimals();
         if (quoteDecimals_ > _MAX_DECIMALS) revert UnsupportedDecimals();
 
@@ -235,11 +217,8 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         // forge-lint: disable-next-line(unsafe-typecast)
         _NAME = bytes32(bytes(name_));
 
-        // Refuse to deploy against a dead configuration: one full composed read, exactly the code
-        // path `getPrices()` will run. A paused pip, a zero quote, a broken feed or a mis-scaled
-        // fold all revert HERE, before an address exists for anyone to wire a pair to. The locals
-        // are passed explicitly rather than read back off the immutables above, so this does not
-        // depend on when a given compiler version permits reading an immutable.
+        // Exercise the complete price path during construction. Parameters are passed directly
+        // because immutables cannot be read reliably until construction completes.
         _compose(IPip(pip_), wsgem_, gemUsdFeed_, gemUsdMaxDelay_, assetUsdFeed_, assetUsdMaxDelay_, scale_);
     }
 
@@ -279,14 +258,12 @@ contract WsgemFraxlendDualOracle is IDualOracle {
 
     // --- Internals ---------------------------------------------------------------------------
 
-    /// @dev The single price path; the constructor's self-check and `getPrices()` both land here.
-    ///      Parameterised so the constructor can use it before the immutables are readable.
+    /// @dev Shared by the constructor self-check and `getPrices()`. Parameters allow the
+    ///      constructor to call it before the immutables are readable.
     ///
-    ///      Read order is load-bearing: pip first (sole pause authority), then both wsgem quotes,
-    ///      then the fiat legs. The final sort is a discipline borrowed from the live reference
-    ///      oracle -- the two spreads are independently settable upstream, so `mintcost >=
-    ///      burncost` is an expectation, not an invariant, and the pair's deviation gate assumes
-    ///      `priceLow <= priceHigh`.
+    ///      The pip must be read before the wsgem quotes because it is the pause authority. The
+    ///      result is sorted because the two spreads are configured independently upstream, while
+    ///      FraxLend expects `priceLow <= priceHigh`.
     function _compose(
         IPip pip_,
         IWsgem wsgem_,
@@ -306,10 +283,8 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         (uint256 assetRaw_, bool assetIsStale_) = _readFeed(assetFeed_, assetDelay_);
         isBadData_ = gemIsStale_ || assetIsStale_;
 
-        // The inversion: the cheaper dollar valuation of the collateral (burncost) buys MORE
-        // collateral per unit of asset, so it is the HIGH side. Floor division on both legs; at
-        // 1e18 scale the +-1 wei is noise against the wrapper's spread, and directional-rounding
-        // theater on top of a sorted pair earns nothing.
+        // The lower collateral valuation from burncost buys more collateral per unit of asset,
+        // so it maps to priceHigh. Both divisions round down.
         priceHigh_ = assetRaw_ * scale_ / (burn_ * gemRaw_);
         priceLow_ = assetRaw_ * scale_ / (mint_ * gemRaw_);
 
@@ -318,10 +293,8 @@ contract WsgemFraxlendDualOracle is IDualOracle {
         if (priceLow_ == 0) revert InvalidPrice();
     }
 
-    /// @dev One Chainlink leg. A valid last answer is still usable after its freshness bound, but
-    ///      is marked stale so FraxLend emits its warning. A future-stamped round is malformed,
-    ///      not extra-fresh: it would make the age subtraction underflow, and a feed that lies
-    ///      about time cannot support an honest staleness signal.
+    /// @dev Returns a positive, timestamped answer and whether it exceeds the freshness bound.
+    ///      Future timestamps are invalid.
     function _readFeed(IChainlinkAggregator feed_, uint256 maxDelay_)
         internal
         view
@@ -331,8 +304,6 @@ contract WsgemFraxlendDualOracle is IDualOracle {
 
         if (answer_ <= 0) revert InvalidFeedAnswer();
         if (updatedAt_ == 0) revert InvalidFeedAnswer();
-        // A validator can nudge a timestamp by seconds; both comparisons here operate at
-        // feed-heartbeat scale (hours), where that nudge decides nothing.
         // forge-lint: disable-next-line(block-timestamp)
         if (updatedAt_ > block.timestamp) revert InvalidFeedAnswer();
         // forge-lint: disable-next-line(block-timestamp)

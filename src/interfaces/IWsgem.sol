@@ -4,17 +4,11 @@ pragma solidity ^0.8.28;
 
 /// @title IWsgem
 /// @notice The subset of a wrapped-staked gem (wsgem) that a FraxLend dual oracle needs.
-/// @dev A wsgem is an ERC-20 wrapper whose value accrues against an underlying `gem`. It does not
-///      rebase: the balance is fixed and the NAV rises. `gem` and `pip` are `immutable` on the
-///      wrapper -- set once in its constructor and never repointable -- so an oracle may read them
-///      once at construction and cache them.
+/// @dev A wsgem is a non-rebasing ERC-20 wrapper over an underlying `gem`. The wrapper sets `gem`
+///      and `pip` in its constructor, so the oracle caches both addresses at construction.
 ///
-///      The two quotes below are the wrapper's own primary market: `mintcost()` is what issuing
-///      one wsgem costs, `burncost()` is what redeeming one pays. They bracket the NAV from above
-///      and below by the wrapper's (adjustable) spreads, which is exactly the band a dual oracle
-///      wants: no third party can buy below `burncost` or sell above `mintcost` while the primary
-///      market is open, so any sustained secondary-market price outside the band is an arbitrage,
-///      not a price.
+///      `mintcost()` is the issuance quote and `burncost()` is the redemption quote. Adjustable
+///      spreads place them above and below NAV.
 interface IWsgem {
     /// @notice The underlying purchase token the wsgem is priced in.
     function gem() external view returns (address);
@@ -24,8 +18,7 @@ interface IWsgem {
 
     /// @notice The raw NAV in gem-per-wsgem at the gem's decimals, un-fee-adjusted. Equals
     ///         `IPip(pip()).read()`.
-    /// @dev Zero means the feed is paused. Callers MUST handle that; it is not an error state the
-    ///      wsgem itself signals.
+    /// @dev Zero means the feed is paused.
     function navprice() external view returns (uint256);
 
     /// @notice The redemption quote in gem-per-wsgem: what one wsgem actually redeems for, i.e.
@@ -43,6 +36,6 @@ interface IWsgem {
     ///      spreads are independently settable -- so a dual oracle sorts rather than assumes.
     function mintcost() external view returns (uint256);
 
-    /// @notice ERC-20 decimals. Constant 18 on every wsgem to date; the oracle asserts it anyway.
+    /// @notice ERC-20 decimals. The oracle requires 18.
     function decimals() external view returns (uint8);
 }

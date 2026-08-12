@@ -14,8 +14,7 @@ contract ConfigDataHarness is WstGBPFrxUSDMarketScript {
 /// @notice Byte-for-byte pins of the instance constants.
 /// @dev Double-entry bookkeeping: every value in `script/WstGBPFrxUSD.s.sol` is retyped here from
 ///      the instance sheet in docs/, so an edit to either file breaks the suite unless both moved
-///      together deliberately. The negative pins carry the same weight as the positive ones --
-///      legacy FRAX and its feed are each one paste away from a silently mispriced market.
+///      together. Negative assertions also exclude legacy FRAX and its feed.
 contract WstGBPFrxUSDDeployScriptTest is Test, WstGBPFrxUSDConstants {
     function test_theChainAndInfrastructureConstantsAreTheMainnetOnes() public pure {
         assertEq(CHAIN_ID(), 1);

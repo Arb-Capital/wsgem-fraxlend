@@ -1,8 +1,8 @@
 # Design
 
 The oracle is a passthrough. Everything below is about making a passthrough safe to stand between
-an administered NAV feed and a lending market, in a protocol whose oracle interface has two sharp
-edges: an inverted price direction, and an advisory-only bad-data flag.
+an administered NAV feed and a lending market. Two FraxLend behaviors are especially relevant:
+its price direction is inverted, and its bad-data flag is advisory.
 
 ## 1. The price direction
 
@@ -36,8 +36,7 @@ branch. For wstGBP/frxUSD (18-decimal tokens, 8-decimal feeds): `PRICE_SCALE = 1
 Worked check at the fork-pinned block (25,730,000): `burncost = 1.005530e18` tGBP,
 `GBP/USD = 1.35139e8`, `frxUSD/USD = 0.99995412e8` → `priceHigh = 735875635048655018`. One wstGBP
 is worth $1.3589, and 1e18 of frxUSD buys 0.7359e18 of it. Floor division on both legs: at 1e18
-scale the ±1 wei is noise against the wrapper's 25 bp spread, and directional-rounding theater on
-top of a sorted pair earns nothing.
+scale the ±1 wei difference is negligible relative to the wrapper's 25 bp spread.
 
 ## 2. The inversion: which quote is "low"?
 
@@ -49,10 +48,10 @@ Because the price is inverted, the *cheaper* dollar valuation of the collateral 
 | high | `burncost()` (NAV net of exit spread) | values collateral at what redemption pays | `priceHigh` | borrow solvency: `_isSolvent(borrower, highExchangeRate)` |
 | low | `mintcost()` (NAV plus issuance spread) | values collateral at what replacement costs | `priceLow` | liquidation trigger and collateral-seized sizing |
 
-The band between them is the wrapper's own primary-market spread — the one corridor no secondary
-price can durably leave while minting and redemption are open, since anything outside it is an
-arbitrage against the wrapper. Borrowing is capped at the pessimistic edge; liquidation fires only
-past the optimistic one. The two spreads are independently settable upstream, so `mintcost >=
+The band between them is the wrapper's primary-market spread. While minting and redemption are
+open, prices outside that band create an arbitrage against the wrapper. Borrowing is capped at the
+pessimistic edge; liquidation starts past the optimistic one. The two spreads are independently
+settable upstream, so `mintcost >=
 burncost` is an expectation, not an invariant: the oracle sorts its outputs and the deviation gate
 (`1e5 * (high - low) / high`, 25 bp today against a 5% gate) is what turns an administratively
 widened spread into a borrowing halt rather than a mispricing.
@@ -77,21 +76,20 @@ The oracle still **reverts** when it cannot form a valid price: paused pip (`Ora
 quote (`InvalidQuote`), non-positive / zero-stamped / future-stamped Chainlink answer
 (`InvalidFeedAnswer`), a composition that floors to zero (`InvalidPrice`), any upstream revert, or
 checked-arithmetic overflow. Those states cannot be repaired by attaching a warning to a
-placeholder. A pip pause deliberately remains a freeze because the upstream protocol has halted
+placeholder. A pip pause remains a freeze because the upstream protocol has halted
 redemptions and publishes no usable NAV.
 
 ## 4. Pip first
 
-`burncost()` and `mintcost()` resolve through the wsgem's gate contract, which sits behind an
-upgradeable proxy of its own. A broken or hostile gate could quote nonzero over a paused feed.
-Only the pip is the pause authority, so `pip.read()` is consulted first and no quote is accepted
-without it. The reads are not folded into one call, on purpose.
+`burncost()` and `mintcost()` resolve through the wsgem's upgradeable gate contract. The gate may
+return a nonzero quote while the pip is paused. Because the pip is the pause authority,
+`pip.read()` is checked before either quote.
 
-## 5. What is deliberately absent
+## 5. Excluded features
 
 - **No owner, no timelock, no settable delays.** Frax's own oracles carry `Timelock2Step` and a
-  settable `maximumOracleDelay`; this one is a passthrough of an already-administered price, and
-  the point is not to add a second discretionary party. A Chainlink heartbeat change means a
+  settable `maximumOracleDelay`; this one is a passthrough of an already-administered price and
+  does not add a second administrative role. A Chainlink heartbeat change means a
   redeploy (stateless, so a replacement costs only gas) and a governance oracle swap on the pair.
 - **No frxUSD hard-peg assumption.** The reference KRWQ oracle treats frxUSD as $1.00; this one
   reads the frxUSD/USD feed, so a depeg moves the price instead of silently mispricing collateral.

@@ -10,10 +10,8 @@ import {IChainlinkAggregator} from "../../src/interfaces/IChainlinkAggregator.so
 import {WstGBPFrxUSDOracleScript} from "../../script/WstGBPFrxUSD.s.sol";
 
 /// @notice The oracle deployed against live mainnet state, through the production script path.
-/// @dev `run()` is exercised whole -- preflight, broadcast, wiring assertions, report -- because
-///      that is the exact pipeline `make oracle-deploy` will execute; a fork suite that
-///      hand-instantiates the oracle proves the contract but leaves the deployment machinery
-///      untested until the broadcast that matters.
+/// @dev Exercises the script path used by `make oracle-deploy`, including preflight and
+///      post-deployment assertions.
 contract WstGBPFrxUSDOracleForkTest is Test {
     // The live addresses, retyped from the instance sheet (docs/instances/wstgbp-frxusd.md).
     address internal constant WSTGBP = 0x57C3571f10767E49C9d7b60feb6c67804783B7aE;
@@ -80,8 +78,7 @@ contract WstGBPFrxUSDOracleForkTest is Test {
     }
 
     function test_theInterfaceIdMatchesWhatTheLiveReferenceOracleRegisters() public view {
-        // The pin that keeps the local IDualOracle declaration honest: the id Solidity computes
-        // from it must be the id the deployed Frax oracle answers `true` for.
+        // Compare the local interface id with the deployed Frax oracle.
         bytes4 id_ = type(IDualOracle).interfaceId;
         assertEq(id_, bytes4(0x415f1303));
         assertTrue(IERC165(KRWQ_ORACLE).supportsInterface(id_));

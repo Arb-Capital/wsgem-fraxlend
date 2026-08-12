@@ -17,7 +17,7 @@ passes the wrapper's own primary-market quotes through to FraxLend:
 
 No owner, no timelock, no setters, no storage. To retune or rename, deploy again.
 
-## Direction, spelled out once
+## Price direction
 
 FraxLend prices are **collateral-per-asset**: `getPrices()` returns how much collateral 1e18 of
 the asset buys ("the amount of collateral to buy 1e18 asset" — FraxlendPairCore). That inverts
@@ -84,8 +84,8 @@ If the oracle transaction lands but automatic source verification fails, do not 
 Recover and verify the existing address using the runbook; a retry would create a second immutable
 oracle while `ORACLE()` is still unset.
 
-A future wsgem market is a new sibling of `script/WstGBPFrxUSD.s.sol` plus its pin test and
-instance sheet — never an edit to `src/` or the generic scripts.
+A future wsgem market should add an instance file beside `script/WstGBPFrxUSD.s.sol`, along with
+its pin test and instance sheet, without changing the generic oracle or deployment scripts.
 
 ## Tests
 

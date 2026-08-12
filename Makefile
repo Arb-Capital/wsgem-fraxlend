@@ -57,7 +57,7 @@ release-info : build
 	@echo -n "oracle creation bytecode keccak: "
 	@forge inspect WsgemFraxlendDualOracle bytecode | cast keccak
 
-# Unit tests. No RPC, no network, no node. Fork tests are excluded on purpose. The redaction
+# Unit tests. No RPC, no network, no node. Fork tests are excluded. The redaction
 # filter's own suite rides along: a silent regression there leaks provider keys into CI logs.
 test        :; forge test --no-match-path "test/fork/*" -vv && python3 scripts/test_redact_rpc_stderr.py
 
@@ -185,7 +185,7 @@ oracle-deploy :
 
 # --- Market ------------------------------------------------------------------------------------
 #
-# `configdata` is the NORMAL terminal state of this repo: it simulates the market script keylessly,
+# `configdata` is the expected hand-off path: it simulates the market script keylessly,
 # which validates the deployed oracle against live state and prints the 288-byte configData plus a
 # per-field decode table. That hex is what the Frax team feeds to their whitelisted
 # FraxlendPairDeployer.deploy(). `market-dry` is the same run under the conventional name.
@@ -209,9 +209,8 @@ market-deploy :
 		--rpc-url $${ETH_RPC_URL} --sender $(ETH_FROM) --keystore $(ETH_KEYSTORE) \
 		$(GAS_FLAGS) --slow --broadcast -vvvv 2> >($(REDACT) >&2)
 
-# Resuming a partial broadcast MUST go through this target, never a direct
-# `forge script --resume` habit from another repo: no clean/build -- the backlog's transactions
-# are already fixed; a rebuild cannot change what gets resumed.
+# Resume a partial broadcast through this target. It skips clean/build because the pending
+# transactions are already fixed and a rebuild cannot change them.
 market-resume :
 	@$(call require_send_env)
 	@$(call require_instance)
